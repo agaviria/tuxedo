@@ -1,0 +1,11 @@
+[package]
+name = "scan"
+version = "0.1.0"
+authors = ["Alejandro Gaviria <mr.gaviria@gmail.com>"]
+
+[[bin]]
+name = "scan"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "2.20.0", features = ["suggestions", "color"] }

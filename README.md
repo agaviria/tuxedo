@@ -1,2 +1,3 @@
-# tuxedo
-A learning Rust personal project.
+Scan
+====
+Personal project to learn Rust programming. CLI scanning and I/O computations.
