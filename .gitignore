@@ -11,3 +11,4 @@ NOTES.md
 
 # configuration file
 conf.toml
+src/conf.rs # until the env variables are loaded from conf.toml

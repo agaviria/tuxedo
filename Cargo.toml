@@ -9,8 +9,11 @@ name = "task"
 path = "src/main.rs"
 
 [dependencies]
-rustc_serialize = "0.3.22"
+futures = "0.1.9"
+mysql_async = "0.5.0"
+rustc-serialize = "0.3.22"
 serde = "0.9.0-rc3"
+tokio-core = "0.1.4"
 toml-config = "0.4.0"
 
 [dependencies.clap]

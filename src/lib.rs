@@ -1,8 +1,6 @@
 extern crate serde;
+extern crate rustc_serialize;
 
+pub mod conf;
 pub mod task;
 pub mod cli;
-
-use std::io::prelude::*;
-use std::fs::File;
-use std::path::Path;
