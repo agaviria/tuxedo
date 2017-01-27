@@ -1,11 +1,17 @@
 [package]
-name = "scan"
-version = "0.1.0"
 authors = ["Alejandro Gaviria <mr.gaviria@gmail.com>"]
+license = "MIT"
+name = "tuxedo"
+version = "0.1.0"
 
 [[bin]]
-name = "scan"
+name = "task"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "2.20.0", features = ["suggestions", "color"] }
+rustc_serialize = "0.3.22"
+serde = "0.9.0-rc3"
+
+[dependencies.clap]
+features = ["suggestions", "color"]
+version = "2.20.0"
