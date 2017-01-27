@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 rustc_serialize = "0.3.22"
 serde = "0.9.0-rc3"
+toml-config = "0.4.0"
 
 [dependencies.clap]
 features = ["suggestions", "color"]
