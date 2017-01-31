@@ -1,11 +1,12 @@
-mod conf;
 mod cli;
+mod conf;
 
 #[macro_use]
 extern crate clap;
 extern crate futures;
 extern crate tokio_core as tokio;
 extern crate rustc_serialize;
+extern crate toml;
 
 #[macro_use]
 extern crate mysql_async as my;
@@ -13,7 +14,10 @@ extern crate mysql_async as my;
 use futures::Future;
 use my::prelude::*;
 use tokio::reactor::Core;
-use conf::Config;
+use conf::Conf;
+use std::path::Path;
+use std::sync::Mutex;
+use toml::Table;
 
 #[derive(Debug, PartialEq, Eq)]
 struct Payment {
@@ -35,8 +39,9 @@ fn main() {
         Payment { customer_id: 9, amount: 10, account_name: Some("bar".into()) },
     ];
 
-    let cfg = conf::load();
-    let pool = my::Pool::new(&*cfg.mysql_uri(), &lp.handle());
+    let mut cfg = Conf::load_file("config.toml");
+    let db = cfg.get_value::<String>("mysql.path").unwrap();
+    let pool = my::Pool::new(db, &lp.handle());
     let future = pool.get_conn()
         .and_then(|conn| {
             // Create temporary table
