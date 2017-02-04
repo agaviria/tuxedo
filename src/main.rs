@@ -14,7 +14,7 @@ extern crate mysql_async as my;
 use futures::Future;
 use my::prelude::*;
 use tokio::reactor::Core;
-use conf::Conf;
+use conf::Config;
 use std::path::Path;
 use std::sync::Mutex;
 use toml::Table;
@@ -39,8 +39,8 @@ fn main() {
         Payment { customer_id: 9, amount: 10, account_name: Some("bar".into()) },
     ];
 
-    let mut cfg = Conf::load_file("config.toml");
-    let db = cfg.get_value::<String>("mysql.path").unwrap();
+    let mut appcfg = Config::load_file();
+    let db = appcfg.get_value::<String>("mysql.path").unwrap();
     let pool = my::Pool::new(db, &lp.handle());
     let future = pool.get_conn()
         .and_then(|conn| {
