@@ -7,8 +7,8 @@
 Cargo.lock
 
 # Personal
-NOTES.md
-TODOS.md
+!*/NOTES.md
+!*/TODOS.md
 
 # configuration file
 config.toml
