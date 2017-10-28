@@ -1,6 +1,6 @@
 TUXEDO
 ======
-Tuxedo is Rust dressed up in Elm.  Rocket as the backend framework with Elm, and HTML template frontend.  
+Tuxedo is Rust dressed up in Elm.  Rocket as the backend framework with Elm, and HTML template frontend.
 The template engine is yet to be defined.  Contenders are Tera, Askama, Handlebars or Maud.
 
 ## Initial build and run:
@@ -22,11 +22,11 @@ npm install --save-dev auto-reload-brunch babel-brunch brunch clean-css-brunch c
 **Step 4:** Install elm project dependencies (Assumes you have Elm installed in system) <br/>
  ```
 $> cd elm
-$> package install elm-lang/html
+$> elm-package install elm-lang/html
  ```
 
 **Step 5:** Run brunch script <br/>
- ```    
+ ```
 $> cd app
 $> brunch build
  ```
