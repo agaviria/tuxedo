@@ -1,20 +1,12 @@
 [package]
-authors = ["Alejandro Gaviria <mr.gaviria@gmail.com>"]
-license = "MIT"
-name = "tuxedo"
+name = "rocket-elm"
 version = "0.1.0"
 
-[[bin]]
-name = "task"
-path = "src/main.rs"
-
 [dependencies]
-futures = "0.1.9"
-mysql_async = "0.5.0"
-rustc-serialize = "0.3.22"
-tokio-core = "0.1.4"
-toml = "0.2.1"
+rocket = "0.3.3"
+rocket_codegen = "0.3.3"
 
-[dependencies.clap]
-features = ["suggestions", "color"]
-version = "2.20.0"
+[dependencies.rocket_contrib]
+version = "0.3.3"
+default-features = false
+features = ["handlebars_templates"]
