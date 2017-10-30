@@ -12,12 +12,18 @@
   "devDependencies": {
     "auto-reload-brunch": "^2.7.1",
     "babel-brunch": "^6.1.1",
+    "bootstrap": "^4.0.0-beta.2",
     "brunch": "^2.10.12",
     "clean-css-brunch": "^2.10.0",
     "css-brunch": "^2.10.0",
     "elm": "^0.18.0",
     "elm-brunch": "^0.9.0",
     "handlebars-brunch": "^2.10.0",
+    "sass-brunch": "^2.10.4",
     "uglify-js-brunch": "^2.10.0"
+  },
+  "dependencies": {
+    "jquery": "^3.2.1",
+    "popper.js": "^1.12.6"
   }
 }

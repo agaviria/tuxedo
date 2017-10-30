@@ -28,14 +28,19 @@ pub fn icon() -> Failure {
     Failure(Status::NotFound)
 }
 
-#[get("/<path..>", rank=5)]
-fn get_static(path: PathBuf) -> Option<NamedFile> {
-    NamedFile::open(Path::new("public/").join(path)).ok()
+#[get("/css/<path..>")]
+fn load_css(path: PathBuf) -> Option<NamedFile> {
+    NamedFile::open(Path::new("public/css/").join(path)).ok()
+}
+
+#[get("/js/<path..>")]
+fn load_js(path: PathBuf) -> Option<NamedFile> {
+    NamedFile::open(Path::new("public/js/").join(path)).ok()
 }
 
 fn rocket() -> rocket::Rocket {
     rocket::ignite()
-        .mount("/", routes![get_static, index, icon])
+        .mount("/", routes![index, load_css, load_js, icon])
         .attach(Template::fairing())
         .catch(errors![not_found])
 }

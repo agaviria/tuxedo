@@ -27,12 +27,14 @@ exports.config = {
     // This option sets where we should place non-css and non-js assets in.
     // By default, we set this to "/assets/static". Files in this directory
     // will be copied to `paths.public`, which is set below to "../public".
-    assets: /^(static)/
+    assets: /^(static)/,
+    // Don't scan for js files inside elm-stuff folders
+    ignored: [/elm-stuff/]
   },
   // paths configuration
   paths: {
     // Dependencies and current project directories to watch
-    watched: ["static", "css", "js", "vendor", "elm"],
+    watched: ["static", "scss", "js", "vendor", "elm"],
     // Where to compile files to
     public: "../public"
   },
@@ -48,6 +50,12 @@ exports.config = {
       makeParameters: ["--warn", "--debug"],
       outputFolder: "../js"
     },
+    sass: {
+      options: {
+        includePaths: ["node_modules/bootstrap/scss"],
+        precision: 8
+      }
+    }
   },
   modules: {
     autoRequire: {
@@ -55,3 +63,11 @@ exports.config = {
     }
   }
 };
+
+exports.npm = {
+  globals: {
+    $: 'jquery',
+    jQuery: 'jquery',
+    Popper: 'popper.js',
+  }
+}
