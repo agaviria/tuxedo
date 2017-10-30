@@ -30,12 +30,12 @@ pub fn icon() -> Failure {
 
 #[get("/css/<path..>")]
 fn load_css(path: PathBuf) -> Option<NamedFile> {
-    NamedFile::open(Path::new("public/css/").join(path)).ok()
+    NamedFile::open(Path::new("css").join(path)).ok()
 }
 
 #[get("/js/<path..>")]
 fn load_js(path: PathBuf) -> Option<NamedFile> {
-    NamedFile::open(Path::new("public/js/").join(path)).ok()
+    NamedFile::open(Path::new("js").join(path)).ok()
 }
 
 fn rocket() -> rocket::Rocket {

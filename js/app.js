@@ -351,19 +351,10 @@ var _main2 = _interopRequireDefault(_main);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-// window.$ = window.jQuery = require('jquery');
-// window.Popper = require('popper.js');
-//
-// require('bootstrap');
-
 var elmDiv = document.querySelector('#elm-container');
 if (elmDiv) {
   _main2.default.Main.embed(elmDiv);
 }
-// document.addEventListener('DOMContentLoaded', () => {
-//   const elmNode = document.getElementById('#elm-main');
-//   Elm.Application.embed(elmNode);
-// })
 });
 
 ;require.register("js/main.js", function(exports, require, module) {
