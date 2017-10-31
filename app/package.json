@@ -1,6 +1,6 @@
 {
-  "name": "app",
-  "version": "1.0.0",
+  "name": "tuxedo",
+  "version": "0.1.0",
   "scripts": {
     "deploy": "brunch build --production",
     "watch": "brunch watch --stdin"
@@ -25,5 +25,6 @@
   "dependencies": {
     "jquery": "^3.2.1",
     "popper.js": "^1.12.6"
-  }
+  },
+  "private": null
 }
