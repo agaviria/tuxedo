@@ -10125,7 +10125,23 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 							}
 						}
 					}),
-					_1: { ctor: '[]' }
+					_1: {
+						ctor: '::',
+						_0: A2(_elm_lang$html$Html$fieldset, { ctor: '[]' }, {
+							ctor: '::',
+							_0: A2(_elm_lang$html$Html$h2, {
+								ctor: '::',
+								_0: _elm_lang$html$Html_Attributes$class('fs-title'),
+								_1: { ctor: '[]' }
+							}, {
+								ctor: '::',
+								_0: _elm_lang$html$Html$text('Personal Details'),
+								_1: { ctor: '[]' }
+							}),
+							_1: { ctor: '[]' }
+						}),
+						_1: { ctor: '[]' }
+					}
 				}),
 				_1: { ctor: '[]' }
 			}),
