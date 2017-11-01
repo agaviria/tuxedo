@@ -1,37 +1,38 @@
 TUXEDO
 ======
-Tuxedo is Rust dressed up in Elm.  Rocket as the backend framework with Elm, and HTML template frontend.
-The template engine is yet to be defined.  Contenders are Tera, Askama, Handlebars or Maud.
+Tuxedo is Rust dressed up in Elm with Sass and bootstrap.  Rocket, is the backend framework, Elm for purely functional frontend development, and handlebars as our HTML templating engine.  The beauty of tuxedo is that you can mix and match your stack to your hearts content.
 
 ## Initial build and run:
 
-**Step 1:** Initialize node project<br/>
+* Initialize node project<br/>
 ```
 $> cd app
 $> npm init
  ```
 
-**Step 2:** (Optional)Open package.json delete `devDependencies`
+ - The next (2) bullets are optional. Do this if you prefer to have latest build dependencies.
 
-**Step 3:** (Optional) Load development dependencies.  Do this to get latest npm dependencies versions.
+* (Optional) Open package.json delete `devDependencies`
+
+* (Optional) Load development dependencies.  Do this to get latest npm dependencies versions.
 
 ```
 npm install --save-dev auto-reload-brunch babel-brunch brunch clean-css-brunch css-brunch elm elm-brunch uglify-js-brunch
 ```
 
-**Step 4:** Install elm project dependencies (Assumes you have Elm installed in system) <br/>
+* Install elm project dependencies (Assumes you have Elm installed in system) <br/>
  ```
 $> cd elm
 $> elm-package install elm-lang/html
  ```
 
-**Step 5:** Run brunch script <br/>
+* Run brunch script <br/>
  ```
 $> cd app
 $> brunch build
  ```
 
-**Step 6:** Cargo build && Run <br/>
+* Cargo build && Run <br/>
  ```
 $> cargo build
 $> cargo run
@@ -39,3 +40,6 @@ $> cargo run
 
 Pointing your browser to [http://localhost:8000](http://localhost:8000) should render text/html.<br/>
 *Caveat: Must have Rust nightly as default.*
+
+## Script run
+Once you have built the code for the first time successfully, you can run `cargo script setup` a script to do some grunt work.  Make sure it builds with status code 0.  Consequentially, run `cargo build.`
