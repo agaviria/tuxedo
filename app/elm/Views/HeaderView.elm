@@ -1,16 +1,29 @@
 module Views.HeaderView exposing (..)
 
-import Html exposing (Html, Attribute, a, button, div, li, nav, span, text, ul)
+import Html exposing (..)
 import Html.Events exposing (onClick)
 import Html.Attributes exposing (..)
 import Models exposing (Model, User, Flash)
 import Msgs exposing (Msg)
+import Util exposing (styles)
+import Css exposing (backgroundColor, hex, padding, px)
+
+
+cComfort : Css.Color
+cComfort =
+    hex "EEEEFF"
 
 
 navBar : Model -> Html Msg
 navBar model =
-    nav [ class "navbar navbar-expand-md navbar-dark bg-dark" ]
-        [ a [ class "navbar-brand", href "#" ] [ text "HOME" ]
+    nav
+        [ class "navbar navbar-expand navbar-light bd-navbar"
+        , styles
+            [ backgroundColor cComfort
+            , padding (px 20)
+            ]
+        ]
+        [ a [ class "navbar-brand", href "#" ] [ text "home" ]
         , navBarCollapseButton
         , div [ class "collapse navbar-collapse", id "navbarSupportedContent" ]
             [ ul [ class "navbar-nav mr-auto" ]
