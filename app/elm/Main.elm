@@ -1,76 +1,40 @@
-module Main exposing (main)
+module Main exposing (..)
 
-import Html exposing (button, div, fieldset, form, h2, h3, input, li, text, ul)
-import Html.Attributes exposing (class, id, type_, name, placeholder, value)
+import Models exposing (Model, initModel)
+import Msgs exposing (Msg)
+import Navigation exposing (Location)
+import Routing
+import Update exposing (update)
+import View exposing (view)
 
 
-main : Html.Html msg
+init : Location -> ( Model, Cmd Msg )
+init location =
+    let
+        currentRoute =
+            Routing.parseLocation location
+    in
+        ( initModel currentRoute, Cmd.none )
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.none
+
+
+
+-- MAIN
+
+
+main : Program Never Model Msg
 main =
-    div [ class "container" ]
-        [ div [ class "row" ]
-            [ div [ class "col-md-6 col-md-offset-3" ]
-                [ div [ id "msform" ]
-                    -- progressbar
-                    [ ul [ id "progressbar" ]
-                        [ li
-                            [ class "active" ]
-                            [ text "Personal Details" ]
-                        , li [] [ text "Social Profile" ]
-                        , li [] [ text "Account Setup" ]
-                        ]
-
-                    -- fieldset [ personal details ]
-                    , fieldset []
-                        [ h2 [ class "fs-title" ]
-                            [ text "Personal Details" ]
-                        , h3 [ class "fs-subtitle" ]
-                            [ text "Please provide info" ]
-                        , input [ type_ "text", name "fname", placeholder "First Name" ]
-                            []
-                        , input [ type_ "text", name "lname", placeholder "Last Name" ]
-                            []
-                        , input [ type_ "text", name "email", placeholder "Email" ]
-                            []
-                        , input [ type_ "button", name "next", class "next action-button", value "Next" ]
-                            []
-                        ]
-
-                    -- fieldset [ social profile ]
-                    , fieldset []
-                        [ h2 [ class "fs-title" ]
-                            [ text "Social Profile" ]
-                        , h3 [ class "fs-subtitle" ]
-                            [ text "Please provide a social network profile" ]
-                        , input [ type_ "text", name "twitter", placeholder "Twitter" ]
-                            []
-                        , input [ type_ "text", name "facebook", placeholder "Facebook" ]
-                            []
-                        , input [ type_ "text", name "instagram", placeholder "Instagram" ]
-                            []
-                        , input [ type_ "button", name "previous", class "previous action-button-previous", value "Previous" ]
-                            []
-                        , input [ type_ "button", name "next", class "next action-button", value "Next" ]
-                            []
-                        ]
-
-                    -- fieldset [ create account ]
-                    , fieldset []
-                        [ h2 [ class "fs-title" ]
-                            [ text "Create a new account" ]
-                        , h3 [ class "fs-subtitle" ]
-                            [ text "Please provide new account details" ]
-                        , input [ type_ "text", name "username", placeholder "username" ]
-                            []
-                        , input [ type_ "password", name "pwd", placeholder "Password" ]
-                            []
-                        , input [ type_ "password", name "cpwd", placeholder "Confirm Password" ]
-                            []
-                        , input [ type_ "button", name "previous", class "previous action-button-previous", value "Previous" ]
-                            []
-                        , input [ type_ "button", name "submit", class "submit action-button", value "Submit" ]
-                            []
-                        ]
-                    ]
-                ]
-            ]
-        ]
+    Navigation.program Msgs.OnLocationChange
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = subscriptions
+        }
