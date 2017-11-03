@@ -338,7 +338,35 @@ process.chdir = function (dir) {
 process.umask = function() { return 0; };
   })();
 });
-require.register("elm/Main.elm", function(exports, require, module) {
+require.register("elm/Commands.elm", function(exports, require, module) {
+
+});
+
+;require.register("elm/Main.elm", function(exports, require, module) {
+
+});
+
+;require.register("elm/Models.elm", function(exports, require, module) {
+
+});
+
+;require.register("elm/Msgs.elm", function(exports, require, module) {
+
+});
+
+;require.register("elm/Routing.elm", function(exports, require, module) {
+
+});
+
+;require.register("elm/Update.elm", function(exports, require, module) {
+
+});
+
+;require.register("elm/View.elm", function(exports, require, module) {
+
+});
+
+;require.register("elm/Views/HeaderView.elm", function(exports, require, module) {
 
 });
 
@@ -616,799 +644,6 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		return fun.arity === 9 ? fun.func(a, b, c, d, e, f, g, h, i) : fun(a)(b)(c)(d)(e)(f)(g)(h)(i);
 	}
 
-	//import Native.List //
-
-	var _elm_lang$core$Native_Array = function () {
-
-		// A RRB-Tree has two distinct data types.
-		// Leaf -> "height"  is always 0
-		//         "table"   is an array of elements
-		// Node -> "height"  is always greater than 0
-		//         "table"   is an array of child nodes
-		//         "lengths" is an array of accumulated lengths of the child nodes
-
-		// M is the maximal table size. 32 seems fast. E is the allowed increase
-		// of search steps when concatting to find an index. Lower values will
-		// decrease balancing, but will increase search steps.
-		var M = 32;
-		var E = 2;
-
-		// An empty array.
-		var empty = {
-			ctor: '_Array',
-			height: 0,
-			table: []
-		};
-
-		function get(i, array) {
-			if (i < 0 || i >= length(array)) {
-				throw new Error('Index ' + i + ' is out of range. Check the length of ' + 'your array first or use getMaybe or getWithDefault.');
-			}
-			return unsafeGet(i, array);
-		}
-
-		function unsafeGet(i, array) {
-			for (var x = array.height; x > 0; x--) {
-				var slot = i >> x * 5;
-				while (array.lengths[slot] <= i) {
-					slot++;
-				}
-				if (slot > 0) {
-					i -= array.lengths[slot - 1];
-				}
-				array = array.table[slot];
-			}
-			return array.table[i];
-		}
-
-		// Sets the value at the index i. Only the nodes leading to i will get
-		// copied and updated.
-		function set(i, item, array) {
-			if (i < 0 || length(array) <= i) {
-				return array;
-			}
-			return unsafeSet(i, item, array);
-		}
-
-		function unsafeSet(i, item, array) {
-			array = nodeCopy(array);
-
-			if (array.height === 0) {
-				array.table[i] = item;
-			} else {
-				var slot = getSlot(i, array);
-				if (slot > 0) {
-					i -= array.lengths[slot - 1];
-				}
-				array.table[slot] = unsafeSet(i, item, array.table[slot]);
-			}
-			return array;
-		}
-
-		function initialize(len, f) {
-			if (len <= 0) {
-				return empty;
-			}
-			var h = Math.floor(Math.log(len) / Math.log(M));
-			return initialize_(f, h, 0, len);
-		}
-
-		function initialize_(f, h, from, to) {
-			if (h === 0) {
-				var table = new Array((to - from) % (M + 1));
-				for (var i = 0; i < table.length; i++) {
-					table[i] = f(from + i);
-				}
-				return {
-					ctor: '_Array',
-					height: 0,
-					table: table
-				};
-			}
-
-			var step = Math.pow(M, h);
-			var table = new Array(Math.ceil((to - from) / step));
-			var lengths = new Array(table.length);
-			for (var i = 0; i < table.length; i++) {
-				table[i] = initialize_(f, h - 1, from + i * step, Math.min(from + (i + 1) * step, to));
-				lengths[i] = length(table[i]) + (i > 0 ? lengths[i - 1] : 0);
-			}
-			return {
-				ctor: '_Array',
-				height: h,
-				table: table,
-				lengths: lengths
-			};
-		}
-
-		function fromList(list) {
-			if (list.ctor === '[]') {
-				return empty;
-			}
-
-			// Allocate M sized blocks (table) and write list elements to it.
-			var table = new Array(M);
-			var nodes = [];
-			var i = 0;
-
-			while (list.ctor !== '[]') {
-				table[i] = list._0;
-				list = list._1;
-				i++;
-
-				// table is full, so we can push a leaf containing it into the
-				// next node.
-				if (i === M) {
-					var leaf = {
-						ctor: '_Array',
-						height: 0,
-						table: table
-					};
-					fromListPush(leaf, nodes);
-					table = new Array(M);
-					i = 0;
-				}
-			}
-
-			// Maybe there is something left on the table.
-			if (i > 0) {
-				var leaf = {
-					ctor: '_Array',
-					height: 0,
-					table: table.splice(0, i)
-				};
-				fromListPush(leaf, nodes);
-			}
-
-			// Go through all of the nodes and eventually push them into higher nodes.
-			for (var h = 0; h < nodes.length - 1; h++) {
-				if (nodes[h].table.length > 0) {
-					fromListPush(nodes[h], nodes);
-				}
-			}
-
-			var head = nodes[nodes.length - 1];
-			if (head.height > 0 && head.table.length === 1) {
-				return head.table[0];
-			} else {
-				return head;
-			}
-		}
-
-		// Push a node into a higher node as a child.
-		function fromListPush(toPush, nodes) {
-			var h = toPush.height;
-
-			// Maybe the node on this height does not exist.
-			if (nodes.length === h) {
-				var node = {
-					ctor: '_Array',
-					height: h + 1,
-					table: [],
-					lengths: []
-				};
-				nodes.push(node);
-			}
-
-			nodes[h].table.push(toPush);
-			var len = length(toPush);
-			if (nodes[h].lengths.length > 0) {
-				len += nodes[h].lengths[nodes[h].lengths.length - 1];
-			}
-			nodes[h].lengths.push(len);
-
-			if (nodes[h].table.length === M) {
-				fromListPush(nodes[h], nodes);
-				nodes[h] = {
-					ctor: '_Array',
-					height: h + 1,
-					table: [],
-					lengths: []
-				};
-			}
-		}
-
-		// Pushes an item via push_ to the bottom right of a tree.
-		function push(item, a) {
-			var pushed = push_(item, a);
-			if (pushed !== null) {
-				return pushed;
-			}
-
-			var newTree = create(item, a.height);
-			return siblise(a, newTree);
-		}
-
-		// Recursively tries to push an item to the bottom-right most
-		// tree possible. If there is no space left for the item,
-		// null will be returned.
-		function push_(item, a) {
-			// Handle resursion stop at leaf level.
-			if (a.height === 0) {
-				if (a.table.length < M) {
-					var newA = {
-						ctor: '_Array',
-						height: 0,
-						table: a.table.slice()
-					};
-					newA.table.push(item);
-					return newA;
-				} else {
-					return null;
-				}
-			}
-
-			// Recursively push
-			var pushed = push_(item, botRight(a));
-
-			// There was space in the bottom right tree, so the slot will
-			// be updated.
-			if (pushed !== null) {
-				var newA = nodeCopy(a);
-				newA.table[newA.table.length - 1] = pushed;
-				newA.lengths[newA.lengths.length - 1]++;
-				return newA;
-			}
-
-			// When there was no space left, check if there is space left
-			// for a new slot with a tree which contains only the item
-			// at the bottom.
-			if (a.table.length < M) {
-				var newSlot = create(item, a.height - 1);
-				var newA = nodeCopy(a);
-				newA.table.push(newSlot);
-				newA.lengths.push(newA.lengths[newA.lengths.length - 1] + length(newSlot));
-				return newA;
-			} else {
-				return null;
-			}
-		}
-
-		// Converts an array into a list of elements.
-		function toList(a) {
-			return toList_(_elm_lang$core$Native_List.Nil, a);
-		}
-
-		function toList_(list, a) {
-			for (var i = a.table.length - 1; i >= 0; i--) {
-				list = a.height === 0 ? _elm_lang$core$Native_List.Cons(a.table[i], list) : toList_(list, a.table[i]);
-			}
-			return list;
-		}
-
-		// Maps a function over the elements of an array.
-		function map(f, a) {
-			var newA = {
-				ctor: '_Array',
-				height: a.height,
-				table: new Array(a.table.length)
-			};
-			if (a.height > 0) {
-				newA.lengths = a.lengths;
-			}
-			for (var i = 0; i < a.table.length; i++) {
-				newA.table[i] = a.height === 0 ? f(a.table[i]) : map(f, a.table[i]);
-			}
-			return newA;
-		}
-
-		// Maps a function over the elements with their index as first argument.
-		function indexedMap(f, a) {
-			return indexedMap_(f, a, 0);
-		}
-
-		function indexedMap_(f, a, from) {
-			var newA = {
-				ctor: '_Array',
-				height: a.height,
-				table: new Array(a.table.length)
-			};
-			if (a.height > 0) {
-				newA.lengths = a.lengths;
-			}
-			for (var i = 0; i < a.table.length; i++) {
-				newA.table[i] = a.height === 0 ? A2(f, from + i, a.table[i]) : indexedMap_(f, a.table[i], i == 0 ? from : from + a.lengths[i - 1]);
-			}
-			return newA;
-		}
-
-		function foldl(f, b, a) {
-			if (a.height === 0) {
-				for (var i = 0; i < a.table.length; i++) {
-					b = A2(f, a.table[i], b);
-				}
-			} else {
-				for (var i = 0; i < a.table.length; i++) {
-					b = foldl(f, b, a.table[i]);
-				}
-			}
-			return b;
-		}
-
-		function foldr(f, b, a) {
-			if (a.height === 0) {
-				for (var i = a.table.length; i--;) {
-					b = A2(f, a.table[i], b);
-				}
-			} else {
-				for (var i = a.table.length; i--;) {
-					b = foldr(f, b, a.table[i]);
-				}
-			}
-			return b;
-		}
-
-		// TODO: currently, it slices the right, then the left. This can be
-		// optimized.
-		function slice(from, to, a) {
-			if (from < 0) {
-				from += length(a);
-			}
-			if (to < 0) {
-				to += length(a);
-			}
-			return sliceLeft(from, sliceRight(to, a));
-		}
-
-		function sliceRight(to, a) {
-			if (to === length(a)) {
-				return a;
-			}
-
-			// Handle leaf level.
-			if (a.height === 0) {
-				var newA = { ctor: '_Array', height: 0 };
-				newA.table = a.table.slice(0, to);
-				return newA;
-			}
-
-			// Slice the right recursively.
-			var right = getSlot(to, a);
-			var sliced = sliceRight(to - (right > 0 ? a.lengths[right - 1] : 0), a.table[right]);
-
-			// Maybe the a node is not even needed, as sliced contains the whole slice.
-			if (right === 0) {
-				return sliced;
-			}
-
-			// Create new node.
-			var newA = {
-				ctor: '_Array',
-				height: a.height,
-				table: a.table.slice(0, right),
-				lengths: a.lengths.slice(0, right)
-			};
-			if (sliced.table.length > 0) {
-				newA.table[right] = sliced;
-				newA.lengths[right] = length(sliced) + (right > 0 ? newA.lengths[right - 1] : 0);
-			}
-			return newA;
-		}
-
-		function sliceLeft(from, a) {
-			if (from === 0) {
-				return a;
-			}
-
-			// Handle leaf level.
-			if (a.height === 0) {
-				var newA = { ctor: '_Array', height: 0 };
-				newA.table = a.table.slice(from, a.table.length + 1);
-				return newA;
-			}
-
-			// Slice the left recursively.
-			var left = getSlot(from, a);
-			var sliced = sliceLeft(from - (left > 0 ? a.lengths[left - 1] : 0), a.table[left]);
-
-			// Maybe the a node is not even needed, as sliced contains the whole slice.
-			if (left === a.table.length - 1) {
-				return sliced;
-			}
-
-			// Create new node.
-			var newA = {
-				ctor: '_Array',
-				height: a.height,
-				table: a.table.slice(left, a.table.length + 1),
-				lengths: new Array(a.table.length - left)
-			};
-			newA.table[0] = sliced;
-			var len = 0;
-			for (var i = 0; i < newA.table.length; i++) {
-				len += length(newA.table[i]);
-				newA.lengths[i] = len;
-			}
-
-			return newA;
-		}
-
-		// Appends two trees.
-		function append(a, b) {
-			if (a.table.length === 0) {
-				return b;
-			}
-			if (b.table.length === 0) {
-				return a;
-			}
-
-			var c = append_(a, b);
-
-			// Check if both nodes can be crunshed together.
-			if (c[0].table.length + c[1].table.length <= M) {
-				if (c[0].table.length === 0) {
-					return c[1];
-				}
-				if (c[1].table.length === 0) {
-					return c[0];
-				}
-
-				// Adjust .table and .lengths
-				c[0].table = c[0].table.concat(c[1].table);
-				if (c[0].height > 0) {
-					var len = length(c[0]);
-					for (var i = 0; i < c[1].lengths.length; i++) {
-						c[1].lengths[i] += len;
-					}
-					c[0].lengths = c[0].lengths.concat(c[1].lengths);
-				}
-
-				return c[0];
-			}
-
-			if (c[0].height > 0) {
-				var toRemove = calcToRemove(a, b);
-				if (toRemove > E) {
-					c = shuffle(c[0], c[1], toRemove);
-				}
-			}
-
-			return siblise(c[0], c[1]);
-		}
-
-		// Returns an array of two nodes; right and left. One node _may_ be empty.
-		function append_(a, b) {
-			if (a.height === 0 && b.height === 0) {
-				return [a, b];
-			}
-
-			if (a.height !== 1 || b.height !== 1) {
-				if (a.height === b.height) {
-					a = nodeCopy(a);
-					b = nodeCopy(b);
-					var appended = append_(botRight(a), botLeft(b));
-
-					insertRight(a, appended[1]);
-					insertLeft(b, appended[0]);
-				} else if (a.height > b.height) {
-					a = nodeCopy(a);
-					var appended = append_(botRight(a), b);
-
-					insertRight(a, appended[0]);
-					b = parentise(appended[1], appended[1].height + 1);
-				} else {
-					b = nodeCopy(b);
-					var appended = append_(a, botLeft(b));
-
-					var left = appended[0].table.length === 0 ? 0 : 1;
-					var right = left === 0 ? 1 : 0;
-					insertLeft(b, appended[left]);
-					a = parentise(appended[right], appended[right].height + 1);
-				}
-			}
-
-			// Check if balancing is needed and return based on that.
-			if (a.table.length === 0 || b.table.length === 0) {
-				return [a, b];
-			}
-
-			var toRemove = calcToRemove(a, b);
-			if (toRemove <= E) {
-				return [a, b];
-			}
-			return shuffle(a, b, toRemove);
-		}
-
-		// Helperfunctions for append_. Replaces a child node at the side of the parent.
-		function insertRight(parent, node) {
-			var index = parent.table.length - 1;
-			parent.table[index] = node;
-			parent.lengths[index] = length(node);
-			parent.lengths[index] += index > 0 ? parent.lengths[index - 1] : 0;
-		}
-
-		function insertLeft(parent, node) {
-			if (node.table.length > 0) {
-				parent.table[0] = node;
-				parent.lengths[0] = length(node);
-
-				var len = length(parent.table[0]);
-				for (var i = 1; i < parent.lengths.length; i++) {
-					len += length(parent.table[i]);
-					parent.lengths[i] = len;
-				}
-			} else {
-				parent.table.shift();
-				for (var i = 1; i < parent.lengths.length; i++) {
-					parent.lengths[i] = parent.lengths[i] - parent.lengths[0];
-				}
-				parent.lengths.shift();
-			}
-		}
-
-		// Returns the extra search steps for E. Refer to the paper.
-		function calcToRemove(a, b) {
-			var subLengths = 0;
-			for (var i = 0; i < a.table.length; i++) {
-				subLengths += a.table[i].table.length;
-			}
-			for (var i = 0; i < b.table.length; i++) {
-				subLengths += b.table[i].table.length;
-			}
-
-			var toRemove = a.table.length + b.table.length;
-			return toRemove - (Math.floor((subLengths - 1) / M) + 1);
-		}
-
-		// get2, set2 and saveSlot are helpers for accessing elements over two arrays.
-		function get2(a, b, index) {
-			return index < a.length ? a[index] : b[index - a.length];
-		}
-
-		function set2(a, b, index, value) {
-			if (index < a.length) {
-				a[index] = value;
-			} else {
-				b[index - a.length] = value;
-			}
-		}
-
-		function saveSlot(a, b, index, slot) {
-			set2(a.table, b.table, index, slot);
-
-			var l = index === 0 || index === a.lengths.length ? 0 : get2(a.lengths, a.lengths, index - 1);
-
-			set2(a.lengths, b.lengths, index, l + length(slot));
-		}
-
-		// Creates a node or leaf with a given length at their arrays for perfomance.
-		// Is only used by shuffle.
-		function createNode(h, length) {
-			if (length < 0) {
-				length = 0;
-			}
-			var a = {
-				ctor: '_Array',
-				height: h,
-				table: new Array(length)
-			};
-			if (h > 0) {
-				a.lengths = new Array(length);
-			}
-			return a;
-		}
-
-		// Returns an array of two balanced nodes.
-		function shuffle(a, b, toRemove) {
-			var newA = createNode(a.height, Math.min(M, a.table.length + b.table.length - toRemove));
-			var newB = createNode(a.height, newA.table.length - (a.table.length + b.table.length - toRemove));
-
-			// Skip the slots with size M. More precise: copy the slot references
-			// to the new node
-			var read = 0;
-			while (get2(a.table, b.table, read).table.length % M === 0) {
-				set2(newA.table, newB.table, read, get2(a.table, b.table, read));
-				set2(newA.lengths, newB.lengths, read, get2(a.lengths, b.lengths, read));
-				read++;
-			}
-
-			// Pulling items from left to right, caching in a slot before writing
-			// it into the new nodes.
-			var write = read;
-			var slot = new createNode(a.height - 1, 0);
-			var from = 0;
-
-			// If the current slot is still containing data, then there will be at
-			// least one more write, so we do not break this loop yet.
-			while (read - write - (slot.table.length > 0 ? 1 : 0) < toRemove) {
-				// Find out the max possible items for copying.
-				var source = get2(a.table, b.table, read);
-				var to = Math.min(M - slot.table.length, source.table.length);
-
-				// Copy and adjust size table.
-				slot.table = slot.table.concat(source.table.slice(from, to));
-				if (slot.height > 0) {
-					var len = slot.lengths.length;
-					for (var i = len; i < len + to - from; i++) {
-						slot.lengths[i] = length(slot.table[i]);
-						slot.lengths[i] += i > 0 ? slot.lengths[i - 1] : 0;
-					}
-				}
-
-				from += to;
-
-				// Only proceed to next slots[i] if the current one was
-				// fully copied.
-				if (source.table.length <= to) {
-					read++;from = 0;
-				}
-
-				// Only create a new slot if the current one is filled up.
-				if (slot.table.length === M) {
-					saveSlot(newA, newB, write, slot);
-					slot = createNode(a.height - 1, 0);
-					write++;
-				}
-			}
-
-			// Cleanup after the loop. Copy the last slot into the new nodes.
-			if (slot.table.length > 0) {
-				saveSlot(newA, newB, write, slot);
-				write++;
-			}
-
-			// Shift the untouched slots to the left
-			while (read < a.table.length + b.table.length) {
-				saveSlot(newA, newB, write, get2(a.table, b.table, read));
-				read++;
-				write++;
-			}
-
-			return [newA, newB];
-		}
-
-		// Navigation functions
-		function botRight(a) {
-			return a.table[a.table.length - 1];
-		}
-		function botLeft(a) {
-			return a.table[0];
-		}
-
-		// Copies a node for updating. Note that you should not use this if
-		// only updating only one of "table" or "lengths" for performance reasons.
-		function nodeCopy(a) {
-			var newA = {
-				ctor: '_Array',
-				height: a.height,
-				table: a.table.slice()
-			};
-			if (a.height > 0) {
-				newA.lengths = a.lengths.slice();
-			}
-			return newA;
-		}
-
-		// Returns how many items are in the tree.
-		function length(array) {
-			if (array.height === 0) {
-				return array.table.length;
-			} else {
-				return array.lengths[array.lengths.length - 1];
-			}
-		}
-
-		// Calculates in which slot of "table" the item probably is, then
-		// find the exact slot via forward searching in  "lengths". Returns the index.
-		function getSlot(i, a) {
-			var slot = i >> 5 * a.height;
-			while (a.lengths[slot] <= i) {
-				slot++;
-			}
-			return slot;
-		}
-
-		// Recursively creates a tree with a given height containing
-		// only the given item.
-		function create(item, h) {
-			if (h === 0) {
-				return {
-					ctor: '_Array',
-					height: 0,
-					table: [item]
-				};
-			}
-			return {
-				ctor: '_Array',
-				height: h,
-				table: [create(item, h - 1)],
-				lengths: [1]
-			};
-		}
-
-		// Recursively creates a tree that contains the given tree.
-		function parentise(tree, h) {
-			if (h === tree.height) {
-				return tree;
-			}
-
-			return {
-				ctor: '_Array',
-				height: h,
-				table: [parentise(tree, h - 1)],
-				lengths: [length(tree)]
-			};
-		}
-
-		// Emphasizes blood brotherhood beneath two trees.
-		function siblise(a, b) {
-			return {
-				ctor: '_Array',
-				height: a.height + 1,
-				table: [a, b],
-				lengths: [length(a), length(a) + length(b)]
-			};
-		}
-
-		function toJSArray(a) {
-			var jsArray = new Array(length(a));
-			toJSArray_(jsArray, 0, a);
-			return jsArray;
-		}
-
-		function toJSArray_(jsArray, i, a) {
-			for (var t = 0; t < a.table.length; t++) {
-				if (a.height === 0) {
-					jsArray[i + t] = a.table[t];
-				} else {
-					var inc = t === 0 ? 0 : a.lengths[t - 1];
-					toJSArray_(jsArray, i + inc, a.table[t]);
-				}
-			}
-		}
-
-		function fromJSArray(jsArray) {
-			if (jsArray.length === 0) {
-				return empty;
-			}
-			var h = Math.floor(Math.log(jsArray.length) / Math.log(M));
-			return fromJSArray_(jsArray, h, 0, jsArray.length);
-		}
-
-		function fromJSArray_(jsArray, h, from, to) {
-			if (h === 0) {
-				return {
-					ctor: '_Array',
-					height: 0,
-					table: jsArray.slice(from, to)
-				};
-			}
-
-			var step = Math.pow(M, h);
-			var table = new Array(Math.ceil((to - from) / step));
-			var lengths = new Array(table.length);
-			for (var i = 0; i < table.length; i++) {
-				table[i] = fromJSArray_(jsArray, h - 1, from + i * step, Math.min(from + (i + 1) * step, to));
-				lengths[i] = length(table[i]) + (i > 0 ? lengths[i - 1] : 0);
-			}
-			return {
-				ctor: '_Array',
-				height: h,
-				table: table,
-				lengths: lengths
-			};
-		}
-
-		return {
-			empty: empty,
-			fromList: fromList,
-			toList: toList,
-			initialize: F2(initialize),
-			append: F2(append),
-			push: F2(push),
-			slice: F3(slice),
-			get: F2(get),
-			set: F3(set),
-			map: F2(map),
-			indexedMap: F2(indexedMap),
-			foldl: F3(foldl),
-			foldr: F3(foldr),
-			length: length,
-
-			toJSArray: toJSArray,
-			fromJSArray: fromJSArray
-		};
-	}();
 	//import Native.Utils //
 
 	var _elm_lang$core$Native_Basics = function () {
@@ -2638,41 +1873,6 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	var _elm_lang$core$List$indexedMap = F2(function (f, xs) {
 		return A3(_elm_lang$core$List$map2, f, A2(_elm_lang$core$List$range, 0, _elm_lang$core$List$length(xs) - 1), xs);
 	});
-
-	var _elm_lang$core$Array$append = _elm_lang$core$Native_Array.append;
-	var _elm_lang$core$Array$length = _elm_lang$core$Native_Array.length;
-	var _elm_lang$core$Array$isEmpty = function _elm_lang$core$Array$isEmpty(array) {
-		return _elm_lang$core$Native_Utils.eq(_elm_lang$core$Array$length(array), 0);
-	};
-	var _elm_lang$core$Array$slice = _elm_lang$core$Native_Array.slice;
-	var _elm_lang$core$Array$set = _elm_lang$core$Native_Array.set;
-	var _elm_lang$core$Array$get = F2(function (i, array) {
-		return _elm_lang$core$Native_Utils.cmp(0, i) < 1 && _elm_lang$core$Native_Utils.cmp(i, _elm_lang$core$Native_Array.length(array)) < 0 ? _elm_lang$core$Maybe$Just(A2(_elm_lang$core$Native_Array.get, i, array)) : _elm_lang$core$Maybe$Nothing;
-	});
-	var _elm_lang$core$Array$push = _elm_lang$core$Native_Array.push;
-	var _elm_lang$core$Array$empty = _elm_lang$core$Native_Array.empty;
-	var _elm_lang$core$Array$filter = F2(function (isOkay, arr) {
-		var update = F2(function (x, xs) {
-			return isOkay(x) ? A2(_elm_lang$core$Native_Array.push, x, xs) : xs;
-		});
-		return A3(_elm_lang$core$Native_Array.foldl, update, _elm_lang$core$Native_Array.empty, arr);
-	});
-	var _elm_lang$core$Array$foldr = _elm_lang$core$Native_Array.foldr;
-	var _elm_lang$core$Array$foldl = _elm_lang$core$Native_Array.foldl;
-	var _elm_lang$core$Array$indexedMap = _elm_lang$core$Native_Array.indexedMap;
-	var _elm_lang$core$Array$map = _elm_lang$core$Native_Array.map;
-	var _elm_lang$core$Array$toIndexedList = function _elm_lang$core$Array$toIndexedList(array) {
-		return A3(_elm_lang$core$List$map2, F2(function (v0, v1) {
-			return { ctor: '_Tuple2', _0: v0, _1: v1 };
-		}), A2(_elm_lang$core$List$range, 0, _elm_lang$core$Native_Array.length(array) - 1), _elm_lang$core$Native_Array.toList(array));
-	};
-	var _elm_lang$core$Array$toList = _elm_lang$core$Native_Array.toList;
-	var _elm_lang$core$Array$fromList = _elm_lang$core$Native_Array.fromList;
-	var _elm_lang$core$Array$initialize = _elm_lang$core$Native_Array.initialize;
-	var _elm_lang$core$Array$repeat = F2(function (n, e) {
-		return A2(_elm_lang$core$Array$initialize, n, _elm_lang$core$Basics$always(e));
-	});
-	var _elm_lang$core$Array$Array = { ctor: 'Array' };
 
 	//import Native.Utils //
 
@@ -3937,6 +3137,2066 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		}), t1, t2);
 	});
 
+	var _elm_lang$http$Native_Http = function () {
+
+		// ENCODING AND DECODING
+
+		function encodeUri(string) {
+			return encodeURIComponent(string);
+		}
+
+		function decodeUri(string) {
+			try {
+				return _elm_lang$core$Maybe$Just(decodeURIComponent(string));
+			} catch (e) {
+				return _elm_lang$core$Maybe$Nothing;
+			}
+		}
+
+		// SEND REQUEST
+
+		function toTask(request, maybeProgress) {
+			return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+				var xhr = new XMLHttpRequest();
+
+				configureProgress(xhr, maybeProgress);
+
+				xhr.addEventListener('error', function () {
+					callback(_elm_lang$core$Native_Scheduler.fail({ ctor: 'NetworkError' }));
+				});
+				xhr.addEventListener('timeout', function () {
+					callback(_elm_lang$core$Native_Scheduler.fail({ ctor: 'Timeout' }));
+				});
+				xhr.addEventListener('load', function () {
+					callback(handleResponse(xhr, request.expect.responseToResult));
+				});
+
+				try {
+					xhr.open(request.method, request.url, true);
+				} catch (e) {
+					return callback(_elm_lang$core$Native_Scheduler.fail({ ctor: 'BadUrl', _0: request.url }));
+				}
+
+				configureRequest(xhr, request);
+				send(xhr, request.body);
+
+				return function () {
+					xhr.abort();
+				};
+			});
+		}
+
+		function configureProgress(xhr, maybeProgress) {
+			if (maybeProgress.ctor === 'Nothing') {
+				return;
+			}
+
+			xhr.addEventListener('progress', function (event) {
+				if (!event.lengthComputable) {
+					return;
+				}
+				_elm_lang$core$Native_Scheduler.rawSpawn(maybeProgress._0({
+					bytes: event.loaded,
+					bytesExpected: event.total
+				}));
+			});
+		}
+
+		function configureRequest(xhr, request) {
+			function setHeader(pair) {
+				xhr.setRequestHeader(pair._0, pair._1);
+			}
+
+			A2(_elm_lang$core$List$map, setHeader, request.headers);
+			xhr.responseType = request.expect.responseType;
+			xhr.withCredentials = request.withCredentials;
+
+			if (request.timeout.ctor === 'Just') {
+				xhr.timeout = request.timeout._0;
+			}
+		}
+
+		function send(xhr, body) {
+			switch (body.ctor) {
+				case 'EmptyBody':
+					xhr.send();
+					return;
+
+				case 'StringBody':
+					xhr.setRequestHeader('Content-Type', body._0);
+					xhr.send(body._1);
+					return;
+
+				case 'FormDataBody':
+					xhr.send(body._0);
+					return;
+			}
+		}
+
+		// RESPONSES
+
+		function handleResponse(xhr, responseToResult) {
+			var response = toResponse(xhr);
+
+			if (xhr.status < 200 || 300 <= xhr.status) {
+				response.body = xhr.responseText;
+				return _elm_lang$core$Native_Scheduler.fail({
+					ctor: 'BadStatus',
+					_0: response
+				});
+			}
+
+			var result = responseToResult(response);
+
+			if (result.ctor === 'Ok') {
+				return _elm_lang$core$Native_Scheduler.succeed(result._0);
+			} else {
+				response.body = xhr.responseText;
+				return _elm_lang$core$Native_Scheduler.fail({
+					ctor: 'BadPayload',
+					_0: result._0,
+					_1: response
+				});
+			}
+		}
+
+		function toResponse(xhr) {
+			return {
+				status: { code: xhr.status, message: xhr.statusText },
+				headers: parseHeaders(xhr.getAllResponseHeaders()),
+				url: xhr.responseURL,
+				body: xhr.response
+			};
+		}
+
+		function parseHeaders(rawHeaders) {
+			var headers = _elm_lang$core$Dict$empty;
+
+			if (!rawHeaders) {
+				return headers;
+			}
+
+			var headerPairs = rawHeaders.split('\r\n');
+			for (var i = headerPairs.length; i--;) {
+				var headerPair = headerPairs[i];
+				var index = headerPair.indexOf(': ');
+				if (index > 0) {
+					var key = headerPair.substring(0, index);
+					var value = headerPair.substring(index + 2);
+
+					headers = A3(_elm_lang$core$Dict$update, key, function (oldValue) {
+						if (oldValue.ctor === 'Just') {
+							return _elm_lang$core$Maybe$Just(value + ', ' + oldValue._0);
+						}
+						return _elm_lang$core$Maybe$Just(value);
+					}, headers);
+				}
+			}
+
+			return headers;
+		}
+
+		// EXPECTORS
+
+		function expectStringResponse(responseToResult) {
+			return {
+				responseType: 'text',
+				responseToResult: responseToResult
+			};
+		}
+
+		function mapExpect(func, expect) {
+			return {
+				responseType: expect.responseType,
+				responseToResult: function responseToResult(response) {
+					var convertedResponse = expect.responseToResult(response);
+					return A2(_elm_lang$core$Result$map, func, convertedResponse);
+				}
+			};
+		}
+
+		// BODY
+
+		function multipart(parts) {
+			var formData = new FormData();
+
+			while (parts.ctor !== '[]') {
+				var part = parts._0;
+				formData.append(part._0, part._1);
+				parts = parts._1;
+			}
+
+			return { ctor: 'FormDataBody', _0: formData };
+		}
+
+		return {
+			toTask: F2(toTask),
+			expectStringResponse: expectStringResponse,
+			mapExpect: F2(mapExpect),
+			multipart: multipart,
+			encodeUri: encodeUri,
+			decodeUri: decodeUri
+		};
+	}();
+
+	//import Native.Utils //
+
+	var _elm_lang$core$Native_Scheduler = function () {
+
+		var MAX_STEPS = 10000;
+
+		// TASKS
+
+		function succeed(value) {
+			return {
+				ctor: '_Task_succeed',
+				value: value
+			};
+		}
+
+		function fail(error) {
+			return {
+				ctor: '_Task_fail',
+				value: error
+			};
+		}
+
+		function nativeBinding(callback) {
+			return {
+				ctor: '_Task_nativeBinding',
+				callback: callback,
+				cancel: null
+			};
+		}
+
+		function andThen(callback, task) {
+			return {
+				ctor: '_Task_andThen',
+				callback: callback,
+				task: task
+			};
+		}
+
+		function onError(callback, task) {
+			return {
+				ctor: '_Task_onError',
+				callback: callback,
+				task: task
+			};
+		}
+
+		function receive(callback) {
+			return {
+				ctor: '_Task_receive',
+				callback: callback
+			};
+		}
+
+		// PROCESSES
+
+		function rawSpawn(task) {
+			var process = {
+				ctor: '_Process',
+				id: _elm_lang$core$Native_Utils.guid(),
+				root: task,
+				stack: null,
+				mailbox: []
+			};
+
+			enqueue(process);
+
+			return process;
+		}
+
+		function spawn(task) {
+			return nativeBinding(function (callback) {
+				var process = rawSpawn(task);
+				callback(succeed(process));
+			});
+		}
+
+		function rawSend(process, msg) {
+			process.mailbox.push(msg);
+			enqueue(process);
+		}
+
+		function send(process, msg) {
+			return nativeBinding(function (callback) {
+				rawSend(process, msg);
+				callback(succeed(_elm_lang$core$Native_Utils.Tuple0));
+			});
+		}
+
+		function kill(process) {
+			return nativeBinding(function (callback) {
+				var root = process.root;
+				if (root.ctor === '_Task_nativeBinding' && root.cancel) {
+					root.cancel();
+				}
+
+				process.root = null;
+
+				callback(succeed(_elm_lang$core$Native_Utils.Tuple0));
+			});
+		}
+
+		function sleep(time) {
+			return nativeBinding(function (callback) {
+				var id = setTimeout(function () {
+					callback(succeed(_elm_lang$core$Native_Utils.Tuple0));
+				}, time);
+
+				return function () {
+					clearTimeout(id);
+				};
+			});
+		}
+
+		// STEP PROCESSES
+
+		function step(numSteps, process) {
+			while (numSteps < MAX_STEPS) {
+				var ctor = process.root.ctor;
+
+				if (ctor === '_Task_succeed') {
+					while (process.stack && process.stack.ctor === '_Task_onError') {
+						process.stack = process.stack.rest;
+					}
+					if (process.stack === null) {
+						break;
+					}
+					process.root = process.stack.callback(process.root.value);
+					process.stack = process.stack.rest;
+					++numSteps;
+					continue;
+				}
+
+				if (ctor === '_Task_fail') {
+					while (process.stack && process.stack.ctor === '_Task_andThen') {
+						process.stack = process.stack.rest;
+					}
+					if (process.stack === null) {
+						break;
+					}
+					process.root = process.stack.callback(process.root.value);
+					process.stack = process.stack.rest;
+					++numSteps;
+					continue;
+				}
+
+				if (ctor === '_Task_andThen') {
+					process.stack = {
+						ctor: '_Task_andThen',
+						callback: process.root.callback,
+						rest: process.stack
+					};
+					process.root = process.root.task;
+					++numSteps;
+					continue;
+				}
+
+				if (ctor === '_Task_onError') {
+					process.stack = {
+						ctor: '_Task_onError',
+						callback: process.root.callback,
+						rest: process.stack
+					};
+					process.root = process.root.task;
+					++numSteps;
+					continue;
+				}
+
+				if (ctor === '_Task_nativeBinding') {
+					process.root.cancel = process.root.callback(function (newRoot) {
+						process.root = newRoot;
+						enqueue(process);
+					});
+
+					break;
+				}
+
+				if (ctor === '_Task_receive') {
+					var mailbox = process.mailbox;
+					if (mailbox.length === 0) {
+						break;
+					}
+
+					process.root = process.root.callback(mailbox.shift());
+					++numSteps;
+					continue;
+				}
+
+				throw new Error(ctor);
+			}
+
+			if (numSteps < MAX_STEPS) {
+				return numSteps + 1;
+			}
+			enqueue(process);
+
+			return numSteps;
+		}
+
+		// WORK QUEUE
+
+		var working = false;
+		var workQueue = [];
+
+		function enqueue(process) {
+			workQueue.push(process);
+
+			if (!working) {
+				setTimeout(work, 0);
+				working = true;
+			}
+		}
+
+		function work() {
+			var numSteps = 0;
+			var process;
+			while (numSteps < MAX_STEPS && (process = workQueue.shift())) {
+				if (process.root) {
+					numSteps = step(numSteps, process);
+				}
+			}
+			if (!process) {
+				working = false;
+				return;
+			}
+			setTimeout(work, 0);
+		}
+
+		return {
+			succeed: succeed,
+			fail: fail,
+			nativeBinding: nativeBinding,
+			andThen: F2(andThen),
+			onError: F2(onError),
+			receive: receive,
+
+			spawn: spawn,
+			kill: kill,
+			sleep: sleep,
+			send: F2(send),
+
+			rawSpawn: rawSpawn,
+			rawSend: rawSend
+		};
+	}();
+	//import Native.Scheduler //
+
+	var _elm_lang$core$Native_Time = function () {
+
+		var now = _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+			callback(_elm_lang$core$Native_Scheduler.succeed(Date.now()));
+		});
+
+		function setInterval_(interval, task) {
+			return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+				var id = setInterval(function () {
+					_elm_lang$core$Native_Scheduler.rawSpawn(task);
+				}, interval);
+
+				return function () {
+					clearInterval(id);
+				};
+			});
+		}
+
+		return {
+			now: now,
+			setInterval_: F2(setInterval_)
+		};
+	}();
+	//import //
+
+	var _elm_lang$core$Native_Platform = function () {
+
+		// PROGRAMS
+
+		function program(impl) {
+			return function (flagDecoder) {
+				return function (object, moduleName) {
+					object['worker'] = function worker(flags) {
+						if (typeof flags !== 'undefined') {
+							throw new Error('The `' + moduleName + '` module does not need flags.\n' + 'Call ' + moduleName + '.worker() with no arguments and you should be all set!');
+						}
+
+						return initialize(impl.init, impl.update, impl.subscriptions, renderer);
+					};
+				};
+			};
+		}
+
+		function programWithFlags(impl) {
+			return function (flagDecoder) {
+				return function (object, moduleName) {
+					object['worker'] = function worker(flags) {
+						if (typeof flagDecoder === 'undefined') {
+							throw new Error('Are you trying to sneak a Never value into Elm? Trickster!\n' + 'It looks like ' + moduleName + '.main is defined with `programWithFlags` but has type `Program Never`.\n' + 'Use `program` instead if you do not want flags.');
+						}
+
+						var result = A2(_elm_lang$core$Native_Json.run, flagDecoder, flags);
+						if (result.ctor === 'Err') {
+							throw new Error(moduleName + '.worker(...) was called with an unexpected argument.\n' + 'I tried to convert it to an Elm value, but ran into this problem:\n\n' + result._0);
+						}
+
+						return initialize(impl.init(result._0), impl.update, impl.subscriptions, renderer);
+					};
+				};
+			};
+		}
+
+		function renderer(enqueue, _) {
+			return function (_) {};
+		}
+
+		// HTML TO PROGRAM
+
+		function htmlToProgram(vnode) {
+			var emptyBag = batch(_elm_lang$core$Native_List.Nil);
+			var noChange = _elm_lang$core$Native_Utils.Tuple2(_elm_lang$core$Native_Utils.Tuple0, emptyBag);
+
+			return _elm_lang$virtual_dom$VirtualDom$program({
+				init: noChange,
+				view: function view(model) {
+					return main;
+				},
+				update: F2(function (msg, model) {
+					return noChange;
+				}),
+				subscriptions: function subscriptions(model) {
+					return emptyBag;
+				}
+			});
+		}
+
+		// INITIALIZE A PROGRAM
+
+		function initialize(init, update, subscriptions, renderer) {
+			// ambient state
+			var managers = {};
+			var updateView;
+
+			// init and update state in main process
+			var initApp = _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+				var model = init._0;
+				updateView = renderer(enqueue, model);
+				var cmds = init._1;
+				var subs = subscriptions(model);
+				dispatchEffects(managers, cmds, subs);
+				callback(_elm_lang$core$Native_Scheduler.succeed(model));
+			});
+
+			function onMessage(msg, model) {
+				return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+					var results = A2(update, msg, model);
+					model = results._0;
+					updateView(model);
+					var cmds = results._1;
+					var subs = subscriptions(model);
+					dispatchEffects(managers, cmds, subs);
+					callback(_elm_lang$core$Native_Scheduler.succeed(model));
+				});
+			}
+
+			var mainProcess = spawnLoop(initApp, onMessage);
+
+			function enqueue(msg) {
+				_elm_lang$core$Native_Scheduler.rawSend(mainProcess, msg);
+			}
+
+			var ports = setupEffects(managers, enqueue);
+
+			return ports ? { ports: ports } : {};
+		}
+
+		// EFFECT MANAGERS
+
+		var effectManagers = {};
+
+		function setupEffects(managers, callback) {
+			var ports;
+
+			// setup all necessary effect managers
+			for (var key in effectManagers) {
+				var manager = effectManagers[key];
+
+				if (manager.isForeign) {
+					ports = ports || {};
+					ports[key] = manager.tag === 'cmd' ? setupOutgoingPort(key) : setupIncomingPort(key, callback);
+				}
+
+				managers[key] = makeManager(manager, callback);
+			}
+
+			return ports;
+		}
+
+		function makeManager(info, callback) {
+			var router = {
+				main: callback,
+				self: undefined
+			};
+
+			var tag = info.tag;
+			var onEffects = info.onEffects;
+			var onSelfMsg = info.onSelfMsg;
+
+			function onMessage(msg, state) {
+				if (msg.ctor === 'self') {
+					return A3(onSelfMsg, router, msg._0, state);
+				}
+
+				var fx = msg._0;
+				switch (tag) {
+					case 'cmd':
+						return A3(onEffects, router, fx.cmds, state);
+
+					case 'sub':
+						return A3(onEffects, router, fx.subs, state);
+
+					case 'fx':
+						return A4(onEffects, router, fx.cmds, fx.subs, state);
+				}
+			}
+
+			var process = spawnLoop(info.init, onMessage);
+			router.self = process;
+			return process;
+		}
+
+		function sendToApp(router, msg) {
+			return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+				router.main(msg);
+				callback(_elm_lang$core$Native_Scheduler.succeed(_elm_lang$core$Native_Utils.Tuple0));
+			});
+		}
+
+		function sendToSelf(router, msg) {
+			return A2(_elm_lang$core$Native_Scheduler.send, router.self, {
+				ctor: 'self',
+				_0: msg
+			});
+		}
+
+		// HELPER for STATEFUL LOOPS
+
+		function spawnLoop(init, onMessage) {
+			var andThen = _elm_lang$core$Native_Scheduler.andThen;
+
+			function loop(state) {
+				var handleMsg = _elm_lang$core$Native_Scheduler.receive(function (msg) {
+					return onMessage(msg, state);
+				});
+				return A2(andThen, loop, handleMsg);
+			}
+
+			var task = A2(andThen, loop, init);
+
+			return _elm_lang$core$Native_Scheduler.rawSpawn(task);
+		}
+
+		// BAGS
+
+		function leaf(home) {
+			return function (value) {
+				return {
+					type: 'leaf',
+					home: home,
+					value: value
+				};
+			};
+		}
+
+		function batch(list) {
+			return {
+				type: 'node',
+				branches: list
+			};
+		}
+
+		function map(tagger, bag) {
+			return {
+				type: 'map',
+				tagger: tagger,
+				tree: bag
+			};
+		}
+
+		// PIPE BAGS INTO EFFECT MANAGERS
+
+		function dispatchEffects(managers, cmdBag, subBag) {
+			var effectsDict = {};
+			gatherEffects(true, cmdBag, effectsDict, null);
+			gatherEffects(false, subBag, effectsDict, null);
+
+			for (var home in managers) {
+				var fx = home in effectsDict ? effectsDict[home] : {
+					cmds: _elm_lang$core$Native_List.Nil,
+					subs: _elm_lang$core$Native_List.Nil
+				};
+
+				_elm_lang$core$Native_Scheduler.rawSend(managers[home], { ctor: 'fx', _0: fx });
+			}
+		}
+
+		function gatherEffects(isCmd, bag, effectsDict, taggers) {
+			switch (bag.type) {
+				case 'leaf':
+					var home = bag.home;
+					var effect = toEffect(isCmd, home, taggers, bag.value);
+					effectsDict[home] = insert(isCmd, effect, effectsDict[home]);
+					return;
+
+				case 'node':
+					var list = bag.branches;
+					while (list.ctor !== '[]') {
+						gatherEffects(isCmd, list._0, effectsDict, taggers);
+						list = list._1;
+					}
+					return;
+
+				case 'map':
+					gatherEffects(isCmd, bag.tree, effectsDict, {
+						tagger: bag.tagger,
+						rest: taggers
+					});
+					return;
+			}
+		}
+
+		function toEffect(isCmd, home, taggers, value) {
+			function applyTaggers(x) {
+				var temp = taggers;
+				while (temp) {
+					x = temp.tagger(x);
+					temp = temp.rest;
+				}
+				return x;
+			}
+
+			var map = isCmd ? effectManagers[home].cmdMap : effectManagers[home].subMap;
+
+			return A2(map, applyTaggers, value);
+		}
+
+		function insert(isCmd, newEffect, effects) {
+			effects = effects || {
+				cmds: _elm_lang$core$Native_List.Nil,
+				subs: _elm_lang$core$Native_List.Nil
+			};
+			if (isCmd) {
+				effects.cmds = _elm_lang$core$Native_List.Cons(newEffect, effects.cmds);
+				return effects;
+			}
+			effects.subs = _elm_lang$core$Native_List.Cons(newEffect, effects.subs);
+			return effects;
+		}
+
+		// PORTS
+
+		function checkPortName(name) {
+			if (name in effectManagers) {
+				throw new Error('There can only be one port named `' + name + '`, but your program has multiple.');
+			}
+		}
+
+		// OUTGOING PORTS
+
+		function outgoingPort(name, converter) {
+			checkPortName(name);
+			effectManagers[name] = {
+				tag: 'cmd',
+				cmdMap: outgoingPortMap,
+				converter: converter,
+				isForeign: true
+			};
+			return leaf(name);
+		}
+
+		var outgoingPortMap = F2(function cmdMap(tagger, value) {
+			return value;
+		});
+
+		function setupOutgoingPort(name) {
+			var subs = [];
+			var converter = effectManagers[name].converter;
+
+			// CREATE MANAGER
+
+			var init = _elm_lang$core$Native_Scheduler.succeed(null);
+
+			function onEffects(router, cmdList, state) {
+				while (cmdList.ctor !== '[]') {
+					// grab a separate reference to subs in case unsubscribe is called
+					var currentSubs = subs;
+					var value = converter(cmdList._0);
+					for (var i = 0; i < currentSubs.length; i++) {
+						currentSubs[i](value);
+					}
+					cmdList = cmdList._1;
+				}
+				return init;
+			}
+
+			effectManagers[name].init = init;
+			effectManagers[name].onEffects = F3(onEffects);
+
+			// PUBLIC API
+
+			function subscribe(callback) {
+				subs.push(callback);
+			}
+
+			function unsubscribe(callback) {
+				// copy subs into a new array in case unsubscribe is called within a
+				// subscribed callback
+				subs = subs.slice();
+				var index = subs.indexOf(callback);
+				if (index >= 0) {
+					subs.splice(index, 1);
+				}
+			}
+
+			return {
+				subscribe: subscribe,
+				unsubscribe: unsubscribe
+			};
+		}
+
+		// INCOMING PORTS
+
+		function incomingPort(name, converter) {
+			checkPortName(name);
+			effectManagers[name] = {
+				tag: 'sub',
+				subMap: incomingPortMap,
+				converter: converter,
+				isForeign: true
+			};
+			return leaf(name);
+		}
+
+		var incomingPortMap = F2(function subMap(tagger, finalTagger) {
+			return function (value) {
+				return tagger(finalTagger(value));
+			};
+		});
+
+		function setupIncomingPort(name, callback) {
+			var sentBeforeInit = [];
+			var subs = _elm_lang$core$Native_List.Nil;
+			var converter = effectManagers[name].converter;
+			var currentOnEffects = preInitOnEffects;
+			var currentSend = preInitSend;
+
+			// CREATE MANAGER
+
+			var init = _elm_lang$core$Native_Scheduler.succeed(null);
+
+			function preInitOnEffects(router, subList, state) {
+				var postInitResult = postInitOnEffects(router, subList, state);
+
+				for (var i = 0; i < sentBeforeInit.length; i++) {
+					postInitSend(sentBeforeInit[i]);
+				}
+
+				sentBeforeInit = null; // to release objects held in queue
+				currentSend = postInitSend;
+				currentOnEffects = postInitOnEffects;
+				return postInitResult;
+			}
+
+			function postInitOnEffects(router, subList, state) {
+				subs = subList;
+				return init;
+			}
+
+			function onEffects(router, subList, state) {
+				return currentOnEffects(router, subList, state);
+			}
+
+			effectManagers[name].init = init;
+			effectManagers[name].onEffects = F3(onEffects);
+
+			// PUBLIC API
+
+			function preInitSend(value) {
+				sentBeforeInit.push(value);
+			}
+
+			function postInitSend(value) {
+				var temp = subs;
+				while (temp.ctor !== '[]') {
+					callback(temp._0(value));
+					temp = temp._1;
+				}
+			}
+
+			function send(incomingValue) {
+				var result = A2(_elm_lang$core$Json_Decode$decodeValue, converter, incomingValue);
+				if (result.ctor === 'Err') {
+					throw new Error('Trying to send an unexpected type of value through port `' + name + '`:\n' + result._0);
+				}
+
+				currentSend(result._0);
+			}
+
+			return { send: send };
+		}
+
+		return {
+			// routers
+			sendToApp: F2(sendToApp),
+			sendToSelf: F2(sendToSelf),
+
+			// global setup
+			effectManagers: effectManagers,
+			outgoingPort: outgoingPort,
+			incomingPort: incomingPort,
+
+			htmlToProgram: htmlToProgram,
+			program: program,
+			programWithFlags: programWithFlags,
+			initialize: initialize,
+
+			// effect bags
+			leaf: leaf,
+			batch: batch,
+			map: F2(map)
+		};
+	}();
+
+	var _elm_lang$core$Platform_Cmd$batch = _elm_lang$core$Native_Platform.batch;
+	var _elm_lang$core$Platform_Cmd$none = _elm_lang$core$Platform_Cmd$batch({ ctor: '[]' });
+	var _elm_lang$core$Platform_Cmd_ops = _elm_lang$core$Platform_Cmd_ops || {};
+	_elm_lang$core$Platform_Cmd_ops['!'] = F2(function (model, commands) {
+		return {
+			ctor: '_Tuple2',
+			_0: model,
+			_1: _elm_lang$core$Platform_Cmd$batch(commands)
+		};
+	});
+	var _elm_lang$core$Platform_Cmd$map = _elm_lang$core$Native_Platform.map;
+	var _elm_lang$core$Platform_Cmd$Cmd = { ctor: 'Cmd' };
+
+	var _elm_lang$core$Platform_Sub$batch = _elm_lang$core$Native_Platform.batch;
+	var _elm_lang$core$Platform_Sub$none = _elm_lang$core$Platform_Sub$batch({ ctor: '[]' });
+	var _elm_lang$core$Platform_Sub$map = _elm_lang$core$Native_Platform.map;
+	var _elm_lang$core$Platform_Sub$Sub = { ctor: 'Sub' };
+
+	var _elm_lang$core$Platform$hack = _elm_lang$core$Native_Scheduler.succeed;
+	var _elm_lang$core$Platform$sendToSelf = _elm_lang$core$Native_Platform.sendToSelf;
+	var _elm_lang$core$Platform$sendToApp = _elm_lang$core$Native_Platform.sendToApp;
+	var _elm_lang$core$Platform$programWithFlags = _elm_lang$core$Native_Platform.programWithFlags;
+	var _elm_lang$core$Platform$program = _elm_lang$core$Native_Platform.program;
+	var _elm_lang$core$Platform$Program = { ctor: 'Program' };
+	var _elm_lang$core$Platform$Task = { ctor: 'Task' };
+	var _elm_lang$core$Platform$ProcessId = { ctor: 'ProcessId' };
+	var _elm_lang$core$Platform$Router = { ctor: 'Router' };
+
+	var _elm_lang$core$Task$onError = _elm_lang$core$Native_Scheduler.onError;
+	var _elm_lang$core$Task$andThen = _elm_lang$core$Native_Scheduler.andThen;
+	var _elm_lang$core$Task$spawnCmd = F2(function (router, _p0) {
+		var _p1 = _p0;
+		return _elm_lang$core$Native_Scheduler.spawn(A2(_elm_lang$core$Task$andThen, _elm_lang$core$Platform$sendToApp(router), _p1._0));
+	});
+	var _elm_lang$core$Task$fail = _elm_lang$core$Native_Scheduler.fail;
+	var _elm_lang$core$Task$mapError = F2(function (convert, task) {
+		return A2(_elm_lang$core$Task$onError, function (_p2) {
+			return _elm_lang$core$Task$fail(convert(_p2));
+		}, task);
+	});
+	var _elm_lang$core$Task$succeed = _elm_lang$core$Native_Scheduler.succeed;
+	var _elm_lang$core$Task$map = F2(function (func, taskA) {
+		return A2(_elm_lang$core$Task$andThen, function (a) {
+			return _elm_lang$core$Task$succeed(func(a));
+		}, taskA);
+	});
+	var _elm_lang$core$Task$map2 = F3(function (func, taskA, taskB) {
+		return A2(_elm_lang$core$Task$andThen, function (a) {
+			return A2(_elm_lang$core$Task$andThen, function (b) {
+				return _elm_lang$core$Task$succeed(A2(func, a, b));
+			}, taskB);
+		}, taskA);
+	});
+	var _elm_lang$core$Task$map3 = F4(function (func, taskA, taskB, taskC) {
+		return A2(_elm_lang$core$Task$andThen, function (a) {
+			return A2(_elm_lang$core$Task$andThen, function (b) {
+				return A2(_elm_lang$core$Task$andThen, function (c) {
+					return _elm_lang$core$Task$succeed(A3(func, a, b, c));
+				}, taskC);
+			}, taskB);
+		}, taskA);
+	});
+	var _elm_lang$core$Task$map4 = F5(function (func, taskA, taskB, taskC, taskD) {
+		return A2(_elm_lang$core$Task$andThen, function (a) {
+			return A2(_elm_lang$core$Task$andThen, function (b) {
+				return A2(_elm_lang$core$Task$andThen, function (c) {
+					return A2(_elm_lang$core$Task$andThen, function (d) {
+						return _elm_lang$core$Task$succeed(A4(func, a, b, c, d));
+					}, taskD);
+				}, taskC);
+			}, taskB);
+		}, taskA);
+	});
+	var _elm_lang$core$Task$map5 = F6(function (func, taskA, taskB, taskC, taskD, taskE) {
+		return A2(_elm_lang$core$Task$andThen, function (a) {
+			return A2(_elm_lang$core$Task$andThen, function (b) {
+				return A2(_elm_lang$core$Task$andThen, function (c) {
+					return A2(_elm_lang$core$Task$andThen, function (d) {
+						return A2(_elm_lang$core$Task$andThen, function (e) {
+							return _elm_lang$core$Task$succeed(A5(func, a, b, c, d, e));
+						}, taskE);
+					}, taskD);
+				}, taskC);
+			}, taskB);
+		}, taskA);
+	});
+	var _elm_lang$core$Task$sequence = function _elm_lang$core$Task$sequence(tasks) {
+		var _p3 = tasks;
+		if (_p3.ctor === '[]') {
+			return _elm_lang$core$Task$succeed({ ctor: '[]' });
+		} else {
+			return A3(_elm_lang$core$Task$map2, F2(function (x, y) {
+				return { ctor: '::', _0: x, _1: y };
+			}), _p3._0, _elm_lang$core$Task$sequence(_p3._1));
+		}
+	};
+	var _elm_lang$core$Task$onEffects = F3(function (router, commands, state) {
+		return A2(_elm_lang$core$Task$map, function (_p4) {
+			return { ctor: '_Tuple0' };
+		}, _elm_lang$core$Task$sequence(A2(_elm_lang$core$List$map, _elm_lang$core$Task$spawnCmd(router), commands)));
+	});
+	var _elm_lang$core$Task$init = _elm_lang$core$Task$succeed({ ctor: '_Tuple0' });
+	var _elm_lang$core$Task$onSelfMsg = F3(function (_p7, _p6, _p5) {
+		return _elm_lang$core$Task$succeed({ ctor: '_Tuple0' });
+	});
+	var _elm_lang$core$Task$command = _elm_lang$core$Native_Platform.leaf('Task');
+	var _elm_lang$core$Task$Perform = function _elm_lang$core$Task$Perform(a) {
+		return { ctor: 'Perform', _0: a };
+	};
+	var _elm_lang$core$Task$perform = F2(function (toMessage, task) {
+		return _elm_lang$core$Task$command(_elm_lang$core$Task$Perform(A2(_elm_lang$core$Task$map, toMessage, task)));
+	});
+	var _elm_lang$core$Task$attempt = F2(function (resultToMessage, task) {
+		return _elm_lang$core$Task$command(_elm_lang$core$Task$Perform(A2(_elm_lang$core$Task$onError, function (_p8) {
+			return _elm_lang$core$Task$succeed(resultToMessage(_elm_lang$core$Result$Err(_p8)));
+		}, A2(_elm_lang$core$Task$andThen, function (_p9) {
+			return _elm_lang$core$Task$succeed(resultToMessage(_elm_lang$core$Result$Ok(_p9)));
+		}, task))));
+	});
+	var _elm_lang$core$Task$cmdMap = F2(function (tagger, _p10) {
+		var _p11 = _p10;
+		return _elm_lang$core$Task$Perform(A2(_elm_lang$core$Task$map, tagger, _p11._0));
+	});
+	_elm_lang$core$Native_Platform.effectManagers['Task'] = { pkg: 'elm-lang/core', init: _elm_lang$core$Task$init, onEffects: _elm_lang$core$Task$onEffects, onSelfMsg: _elm_lang$core$Task$onSelfMsg, tag: 'cmd', cmdMap: _elm_lang$core$Task$cmdMap };
+
+	var _elm_lang$core$Time$setInterval = _elm_lang$core$Native_Time.setInterval_;
+	var _elm_lang$core$Time$spawnHelp = F3(function (router, intervals, processes) {
+		var _p0 = intervals;
+		if (_p0.ctor === '[]') {
+			return _elm_lang$core$Task$succeed(processes);
+		} else {
+			var _p1 = _p0._0;
+			var spawnRest = function spawnRest(id) {
+				return A3(_elm_lang$core$Time$spawnHelp, router, _p0._1, A3(_elm_lang$core$Dict$insert, _p1, id, processes));
+			};
+			var spawnTimer = _elm_lang$core$Native_Scheduler.spawn(A2(_elm_lang$core$Time$setInterval, _p1, A2(_elm_lang$core$Platform$sendToSelf, router, _p1)));
+			return A2(_elm_lang$core$Task$andThen, spawnRest, spawnTimer);
+		}
+	});
+	var _elm_lang$core$Time$addMySub = F2(function (_p2, state) {
+		var _p3 = _p2;
+		var _p6 = _p3._1;
+		var _p5 = _p3._0;
+		var _p4 = A2(_elm_lang$core$Dict$get, _p5, state);
+		if (_p4.ctor === 'Nothing') {
+			return A3(_elm_lang$core$Dict$insert, _p5, {
+				ctor: '::',
+				_0: _p6,
+				_1: { ctor: '[]' }
+			}, state);
+		} else {
+			return A3(_elm_lang$core$Dict$insert, _p5, { ctor: '::', _0: _p6, _1: _p4._0 }, state);
+		}
+	});
+	var _elm_lang$core$Time$inMilliseconds = function _elm_lang$core$Time$inMilliseconds(t) {
+		return t;
+	};
+	var _elm_lang$core$Time$millisecond = 1;
+	var _elm_lang$core$Time$second = 1000 * _elm_lang$core$Time$millisecond;
+	var _elm_lang$core$Time$minute = 60 * _elm_lang$core$Time$second;
+	var _elm_lang$core$Time$hour = 60 * _elm_lang$core$Time$minute;
+	var _elm_lang$core$Time$inHours = function _elm_lang$core$Time$inHours(t) {
+		return t / _elm_lang$core$Time$hour;
+	};
+	var _elm_lang$core$Time$inMinutes = function _elm_lang$core$Time$inMinutes(t) {
+		return t / _elm_lang$core$Time$minute;
+	};
+	var _elm_lang$core$Time$inSeconds = function _elm_lang$core$Time$inSeconds(t) {
+		return t / _elm_lang$core$Time$second;
+	};
+	var _elm_lang$core$Time$now = _elm_lang$core$Native_Time.now;
+	var _elm_lang$core$Time$onSelfMsg = F3(function (router, interval, state) {
+		var _p7 = A2(_elm_lang$core$Dict$get, interval, state.taggers);
+		if (_p7.ctor === 'Nothing') {
+			return _elm_lang$core$Task$succeed(state);
+		} else {
+			var tellTaggers = function tellTaggers(time) {
+				return _elm_lang$core$Task$sequence(A2(_elm_lang$core$List$map, function (tagger) {
+					return A2(_elm_lang$core$Platform$sendToApp, router, tagger(time));
+				}, _p7._0));
+			};
+			return A2(_elm_lang$core$Task$andThen, function (_p8) {
+				return _elm_lang$core$Task$succeed(state);
+			}, A2(_elm_lang$core$Task$andThen, tellTaggers, _elm_lang$core$Time$now));
+		}
+	});
+	var _elm_lang$core$Time$subscription = _elm_lang$core$Native_Platform.leaf('Time');
+	var _elm_lang$core$Time$State = F2(function (a, b) {
+		return { taggers: a, processes: b };
+	});
+	var _elm_lang$core$Time$init = _elm_lang$core$Task$succeed(A2(_elm_lang$core$Time$State, _elm_lang$core$Dict$empty, _elm_lang$core$Dict$empty));
+	var _elm_lang$core$Time$onEffects = F3(function (router, subs, _p9) {
+		var _p10 = _p9;
+		var rightStep = F3(function (_p12, id, _p11) {
+			var _p13 = _p11;
+			return {
+				ctor: '_Tuple3',
+				_0: _p13._0,
+				_1: _p13._1,
+				_2: A2(_elm_lang$core$Task$andThen, function (_p14) {
+					return _p13._2;
+				}, _elm_lang$core$Native_Scheduler.kill(id))
+			};
+		});
+		var bothStep = F4(function (interval, taggers, id, _p15) {
+			var _p16 = _p15;
+			return {
+				ctor: '_Tuple3',
+				_0: _p16._0,
+				_1: A3(_elm_lang$core$Dict$insert, interval, id, _p16._1),
+				_2: _p16._2
+			};
+		});
+		var leftStep = F3(function (interval, taggers, _p17) {
+			var _p18 = _p17;
+			return {
+				ctor: '_Tuple3',
+				_0: { ctor: '::', _0: interval, _1: _p18._0 },
+				_1: _p18._1,
+				_2: _p18._2
+			};
+		});
+		var newTaggers = A3(_elm_lang$core$List$foldl, _elm_lang$core$Time$addMySub, _elm_lang$core$Dict$empty, subs);
+		var _p19 = A6(_elm_lang$core$Dict$merge, leftStep, bothStep, rightStep, newTaggers, _p10.processes, {
+			ctor: '_Tuple3',
+			_0: { ctor: '[]' },
+			_1: _elm_lang$core$Dict$empty,
+			_2: _elm_lang$core$Task$succeed({ ctor: '_Tuple0' })
+		});
+		var spawnList = _p19._0;
+		var existingDict = _p19._1;
+		var killTask = _p19._2;
+		return A2(_elm_lang$core$Task$andThen, function (newProcesses) {
+			return _elm_lang$core$Task$succeed(A2(_elm_lang$core$Time$State, newTaggers, newProcesses));
+		}, A2(_elm_lang$core$Task$andThen, function (_p20) {
+			return A3(_elm_lang$core$Time$spawnHelp, router, spawnList, existingDict);
+		}, killTask));
+	});
+	var _elm_lang$core$Time$Every = F2(function (a, b) {
+		return { ctor: 'Every', _0: a, _1: b };
+	});
+	var _elm_lang$core$Time$every = F2(function (interval, tagger) {
+		return _elm_lang$core$Time$subscription(A2(_elm_lang$core$Time$Every, interval, tagger));
+	});
+	var _elm_lang$core$Time$subMap = F2(function (f, _p21) {
+		var _p22 = _p21;
+		return A2(_elm_lang$core$Time$Every, _p22._0, function (_p23) {
+			return f(_p22._1(_p23));
+		});
+	});
+	_elm_lang$core$Native_Platform.effectManagers['Time'] = { pkg: 'elm-lang/core', init: _elm_lang$core$Time$init, onEffects: _elm_lang$core$Time$onEffects, onSelfMsg: _elm_lang$core$Time$onSelfMsg, tag: 'sub', subMap: _elm_lang$core$Time$subMap };
+
+	var _elm_lang$core$Debug$crash = _elm_lang$core$Native_Debug.crash;
+	var _elm_lang$core$Debug$log = _elm_lang$core$Native_Debug.log;
+
+	var _elm_lang$core$Tuple$mapSecond = F2(function (func, _p0) {
+		var _p1 = _p0;
+		return {
+			ctor: '_Tuple2',
+			_0: _p1._0,
+			_1: func(_p1._1)
+		};
+	});
+	var _elm_lang$core$Tuple$mapFirst = F2(function (func, _p2) {
+		var _p3 = _p2;
+		return {
+			ctor: '_Tuple2',
+			_0: func(_p3._0),
+			_1: _p3._1
+		};
+	});
+	var _elm_lang$core$Tuple$second = function _elm_lang$core$Tuple$second(_p4) {
+		var _p5 = _p4;
+		return _p5._1;
+	};
+	var _elm_lang$core$Tuple$first = function _elm_lang$core$Tuple$first(_p6) {
+		var _p7 = _p6;
+		return _p7._0;
+	};
+
+	var _elm_lang$http$Http_Internal$map = F2(function (func, request) {
+		return _elm_lang$core$Native_Utils.update(request, {
+			expect: A2(_elm_lang$http$Native_Http.mapExpect, func, request.expect)
+		});
+	});
+	var _elm_lang$http$Http_Internal$RawRequest = F7(function (a, b, c, d, e, f, g) {
+		return { method: a, headers: b, url: c, body: d, expect: e, timeout: f, withCredentials: g };
+	});
+	var _elm_lang$http$Http_Internal$Request = function _elm_lang$http$Http_Internal$Request(a) {
+		return { ctor: 'Request', _0: a };
+	};
+	var _elm_lang$http$Http_Internal$Expect = { ctor: 'Expect' };
+	var _elm_lang$http$Http_Internal$FormDataBody = { ctor: 'FormDataBody' };
+	var _elm_lang$http$Http_Internal$StringBody = F2(function (a, b) {
+		return { ctor: 'StringBody', _0: a, _1: b };
+	});
+	var _elm_lang$http$Http_Internal$EmptyBody = { ctor: 'EmptyBody' };
+	var _elm_lang$http$Http_Internal$Header = F2(function (a, b) {
+		return { ctor: 'Header', _0: a, _1: b };
+	});
+
+	//import Native.List //
+
+	var _elm_lang$core$Native_Array = function () {
+
+		// A RRB-Tree has two distinct data types.
+		// Leaf -> "height"  is always 0
+		//         "table"   is an array of elements
+		// Node -> "height"  is always greater than 0
+		//         "table"   is an array of child nodes
+		//         "lengths" is an array of accumulated lengths of the child nodes
+
+		// M is the maximal table size. 32 seems fast. E is the allowed increase
+		// of search steps when concatting to find an index. Lower values will
+		// decrease balancing, but will increase search steps.
+		var M = 32;
+		var E = 2;
+
+		// An empty array.
+		var empty = {
+			ctor: '_Array',
+			height: 0,
+			table: []
+		};
+
+		function get(i, array) {
+			if (i < 0 || i >= length(array)) {
+				throw new Error('Index ' + i + ' is out of range. Check the length of ' + 'your array first or use getMaybe or getWithDefault.');
+			}
+			return unsafeGet(i, array);
+		}
+
+		function unsafeGet(i, array) {
+			for (var x = array.height; x > 0; x--) {
+				var slot = i >> x * 5;
+				while (array.lengths[slot] <= i) {
+					slot++;
+				}
+				if (slot > 0) {
+					i -= array.lengths[slot - 1];
+				}
+				array = array.table[slot];
+			}
+			return array.table[i];
+		}
+
+		// Sets the value at the index i. Only the nodes leading to i will get
+		// copied and updated.
+		function set(i, item, array) {
+			if (i < 0 || length(array) <= i) {
+				return array;
+			}
+			return unsafeSet(i, item, array);
+		}
+
+		function unsafeSet(i, item, array) {
+			array = nodeCopy(array);
+
+			if (array.height === 0) {
+				array.table[i] = item;
+			} else {
+				var slot = getSlot(i, array);
+				if (slot > 0) {
+					i -= array.lengths[slot - 1];
+				}
+				array.table[slot] = unsafeSet(i, item, array.table[slot]);
+			}
+			return array;
+		}
+
+		function initialize(len, f) {
+			if (len <= 0) {
+				return empty;
+			}
+			var h = Math.floor(Math.log(len) / Math.log(M));
+			return initialize_(f, h, 0, len);
+		}
+
+		function initialize_(f, h, from, to) {
+			if (h === 0) {
+				var table = new Array((to - from) % (M + 1));
+				for (var i = 0; i < table.length; i++) {
+					table[i] = f(from + i);
+				}
+				return {
+					ctor: '_Array',
+					height: 0,
+					table: table
+				};
+			}
+
+			var step = Math.pow(M, h);
+			var table = new Array(Math.ceil((to - from) / step));
+			var lengths = new Array(table.length);
+			for (var i = 0; i < table.length; i++) {
+				table[i] = initialize_(f, h - 1, from + i * step, Math.min(from + (i + 1) * step, to));
+				lengths[i] = length(table[i]) + (i > 0 ? lengths[i - 1] : 0);
+			}
+			return {
+				ctor: '_Array',
+				height: h,
+				table: table,
+				lengths: lengths
+			};
+		}
+
+		function fromList(list) {
+			if (list.ctor === '[]') {
+				return empty;
+			}
+
+			// Allocate M sized blocks (table) and write list elements to it.
+			var table = new Array(M);
+			var nodes = [];
+			var i = 0;
+
+			while (list.ctor !== '[]') {
+				table[i] = list._0;
+				list = list._1;
+				i++;
+
+				// table is full, so we can push a leaf containing it into the
+				// next node.
+				if (i === M) {
+					var leaf = {
+						ctor: '_Array',
+						height: 0,
+						table: table
+					};
+					fromListPush(leaf, nodes);
+					table = new Array(M);
+					i = 0;
+				}
+			}
+
+			// Maybe there is something left on the table.
+			if (i > 0) {
+				var leaf = {
+					ctor: '_Array',
+					height: 0,
+					table: table.splice(0, i)
+				};
+				fromListPush(leaf, nodes);
+			}
+
+			// Go through all of the nodes and eventually push them into higher nodes.
+			for (var h = 0; h < nodes.length - 1; h++) {
+				if (nodes[h].table.length > 0) {
+					fromListPush(nodes[h], nodes);
+				}
+			}
+
+			var head = nodes[nodes.length - 1];
+			if (head.height > 0 && head.table.length === 1) {
+				return head.table[0];
+			} else {
+				return head;
+			}
+		}
+
+		// Push a node into a higher node as a child.
+		function fromListPush(toPush, nodes) {
+			var h = toPush.height;
+
+			// Maybe the node on this height does not exist.
+			if (nodes.length === h) {
+				var node = {
+					ctor: '_Array',
+					height: h + 1,
+					table: [],
+					lengths: []
+				};
+				nodes.push(node);
+			}
+
+			nodes[h].table.push(toPush);
+			var len = length(toPush);
+			if (nodes[h].lengths.length > 0) {
+				len += nodes[h].lengths[nodes[h].lengths.length - 1];
+			}
+			nodes[h].lengths.push(len);
+
+			if (nodes[h].table.length === M) {
+				fromListPush(nodes[h], nodes);
+				nodes[h] = {
+					ctor: '_Array',
+					height: h + 1,
+					table: [],
+					lengths: []
+				};
+			}
+		}
+
+		// Pushes an item via push_ to the bottom right of a tree.
+		function push(item, a) {
+			var pushed = push_(item, a);
+			if (pushed !== null) {
+				return pushed;
+			}
+
+			var newTree = create(item, a.height);
+			return siblise(a, newTree);
+		}
+
+		// Recursively tries to push an item to the bottom-right most
+		// tree possible. If there is no space left for the item,
+		// null will be returned.
+		function push_(item, a) {
+			// Handle resursion stop at leaf level.
+			if (a.height === 0) {
+				if (a.table.length < M) {
+					var newA = {
+						ctor: '_Array',
+						height: 0,
+						table: a.table.slice()
+					};
+					newA.table.push(item);
+					return newA;
+				} else {
+					return null;
+				}
+			}
+
+			// Recursively push
+			var pushed = push_(item, botRight(a));
+
+			// There was space in the bottom right tree, so the slot will
+			// be updated.
+			if (pushed !== null) {
+				var newA = nodeCopy(a);
+				newA.table[newA.table.length - 1] = pushed;
+				newA.lengths[newA.lengths.length - 1]++;
+				return newA;
+			}
+
+			// When there was no space left, check if there is space left
+			// for a new slot with a tree which contains only the item
+			// at the bottom.
+			if (a.table.length < M) {
+				var newSlot = create(item, a.height - 1);
+				var newA = nodeCopy(a);
+				newA.table.push(newSlot);
+				newA.lengths.push(newA.lengths[newA.lengths.length - 1] + length(newSlot));
+				return newA;
+			} else {
+				return null;
+			}
+		}
+
+		// Converts an array into a list of elements.
+		function toList(a) {
+			return toList_(_elm_lang$core$Native_List.Nil, a);
+		}
+
+		function toList_(list, a) {
+			for (var i = a.table.length - 1; i >= 0; i--) {
+				list = a.height === 0 ? _elm_lang$core$Native_List.Cons(a.table[i], list) : toList_(list, a.table[i]);
+			}
+			return list;
+		}
+
+		// Maps a function over the elements of an array.
+		function map(f, a) {
+			var newA = {
+				ctor: '_Array',
+				height: a.height,
+				table: new Array(a.table.length)
+			};
+			if (a.height > 0) {
+				newA.lengths = a.lengths;
+			}
+			for (var i = 0; i < a.table.length; i++) {
+				newA.table[i] = a.height === 0 ? f(a.table[i]) : map(f, a.table[i]);
+			}
+			return newA;
+		}
+
+		// Maps a function over the elements with their index as first argument.
+		function indexedMap(f, a) {
+			return indexedMap_(f, a, 0);
+		}
+
+		function indexedMap_(f, a, from) {
+			var newA = {
+				ctor: '_Array',
+				height: a.height,
+				table: new Array(a.table.length)
+			};
+			if (a.height > 0) {
+				newA.lengths = a.lengths;
+			}
+			for (var i = 0; i < a.table.length; i++) {
+				newA.table[i] = a.height === 0 ? A2(f, from + i, a.table[i]) : indexedMap_(f, a.table[i], i == 0 ? from : from + a.lengths[i - 1]);
+			}
+			return newA;
+		}
+
+		function foldl(f, b, a) {
+			if (a.height === 0) {
+				for (var i = 0; i < a.table.length; i++) {
+					b = A2(f, a.table[i], b);
+				}
+			} else {
+				for (var i = 0; i < a.table.length; i++) {
+					b = foldl(f, b, a.table[i]);
+				}
+			}
+			return b;
+		}
+
+		function foldr(f, b, a) {
+			if (a.height === 0) {
+				for (var i = a.table.length; i--;) {
+					b = A2(f, a.table[i], b);
+				}
+			} else {
+				for (var i = a.table.length; i--;) {
+					b = foldr(f, b, a.table[i]);
+				}
+			}
+			return b;
+		}
+
+		// TODO: currently, it slices the right, then the left. This can be
+		// optimized.
+		function slice(from, to, a) {
+			if (from < 0) {
+				from += length(a);
+			}
+			if (to < 0) {
+				to += length(a);
+			}
+			return sliceLeft(from, sliceRight(to, a));
+		}
+
+		function sliceRight(to, a) {
+			if (to === length(a)) {
+				return a;
+			}
+
+			// Handle leaf level.
+			if (a.height === 0) {
+				var newA = { ctor: '_Array', height: 0 };
+				newA.table = a.table.slice(0, to);
+				return newA;
+			}
+
+			// Slice the right recursively.
+			var right = getSlot(to, a);
+			var sliced = sliceRight(to - (right > 0 ? a.lengths[right - 1] : 0), a.table[right]);
+
+			// Maybe the a node is not even needed, as sliced contains the whole slice.
+			if (right === 0) {
+				return sliced;
+			}
+
+			// Create new node.
+			var newA = {
+				ctor: '_Array',
+				height: a.height,
+				table: a.table.slice(0, right),
+				lengths: a.lengths.slice(0, right)
+			};
+			if (sliced.table.length > 0) {
+				newA.table[right] = sliced;
+				newA.lengths[right] = length(sliced) + (right > 0 ? newA.lengths[right - 1] : 0);
+			}
+			return newA;
+		}
+
+		function sliceLeft(from, a) {
+			if (from === 0) {
+				return a;
+			}
+
+			// Handle leaf level.
+			if (a.height === 0) {
+				var newA = { ctor: '_Array', height: 0 };
+				newA.table = a.table.slice(from, a.table.length + 1);
+				return newA;
+			}
+
+			// Slice the left recursively.
+			var left = getSlot(from, a);
+			var sliced = sliceLeft(from - (left > 0 ? a.lengths[left - 1] : 0), a.table[left]);
+
+			// Maybe the a node is not even needed, as sliced contains the whole slice.
+			if (left === a.table.length - 1) {
+				return sliced;
+			}
+
+			// Create new node.
+			var newA = {
+				ctor: '_Array',
+				height: a.height,
+				table: a.table.slice(left, a.table.length + 1),
+				lengths: new Array(a.table.length - left)
+			};
+			newA.table[0] = sliced;
+			var len = 0;
+			for (var i = 0; i < newA.table.length; i++) {
+				len += length(newA.table[i]);
+				newA.lengths[i] = len;
+			}
+
+			return newA;
+		}
+
+		// Appends two trees.
+		function append(a, b) {
+			if (a.table.length === 0) {
+				return b;
+			}
+			if (b.table.length === 0) {
+				return a;
+			}
+
+			var c = append_(a, b);
+
+			// Check if both nodes can be crunshed together.
+			if (c[0].table.length + c[1].table.length <= M) {
+				if (c[0].table.length === 0) {
+					return c[1];
+				}
+				if (c[1].table.length === 0) {
+					return c[0];
+				}
+
+				// Adjust .table and .lengths
+				c[0].table = c[0].table.concat(c[1].table);
+				if (c[0].height > 0) {
+					var len = length(c[0]);
+					for (var i = 0; i < c[1].lengths.length; i++) {
+						c[1].lengths[i] += len;
+					}
+					c[0].lengths = c[0].lengths.concat(c[1].lengths);
+				}
+
+				return c[0];
+			}
+
+			if (c[0].height > 0) {
+				var toRemove = calcToRemove(a, b);
+				if (toRemove > E) {
+					c = shuffle(c[0], c[1], toRemove);
+				}
+			}
+
+			return siblise(c[0], c[1]);
+		}
+
+		// Returns an array of two nodes; right and left. One node _may_ be empty.
+		function append_(a, b) {
+			if (a.height === 0 && b.height === 0) {
+				return [a, b];
+			}
+
+			if (a.height !== 1 || b.height !== 1) {
+				if (a.height === b.height) {
+					a = nodeCopy(a);
+					b = nodeCopy(b);
+					var appended = append_(botRight(a), botLeft(b));
+
+					insertRight(a, appended[1]);
+					insertLeft(b, appended[0]);
+				} else if (a.height > b.height) {
+					a = nodeCopy(a);
+					var appended = append_(botRight(a), b);
+
+					insertRight(a, appended[0]);
+					b = parentise(appended[1], appended[1].height + 1);
+				} else {
+					b = nodeCopy(b);
+					var appended = append_(a, botLeft(b));
+
+					var left = appended[0].table.length === 0 ? 0 : 1;
+					var right = left === 0 ? 1 : 0;
+					insertLeft(b, appended[left]);
+					a = parentise(appended[right], appended[right].height + 1);
+				}
+			}
+
+			// Check if balancing is needed and return based on that.
+			if (a.table.length === 0 || b.table.length === 0) {
+				return [a, b];
+			}
+
+			var toRemove = calcToRemove(a, b);
+			if (toRemove <= E) {
+				return [a, b];
+			}
+			return shuffle(a, b, toRemove);
+		}
+
+		// Helperfunctions for append_. Replaces a child node at the side of the parent.
+		function insertRight(parent, node) {
+			var index = parent.table.length - 1;
+			parent.table[index] = node;
+			parent.lengths[index] = length(node);
+			parent.lengths[index] += index > 0 ? parent.lengths[index - 1] : 0;
+		}
+
+		function insertLeft(parent, node) {
+			if (node.table.length > 0) {
+				parent.table[0] = node;
+				parent.lengths[0] = length(node);
+
+				var len = length(parent.table[0]);
+				for (var i = 1; i < parent.lengths.length; i++) {
+					len += length(parent.table[i]);
+					parent.lengths[i] = len;
+				}
+			} else {
+				parent.table.shift();
+				for (var i = 1; i < parent.lengths.length; i++) {
+					parent.lengths[i] = parent.lengths[i] - parent.lengths[0];
+				}
+				parent.lengths.shift();
+			}
+		}
+
+		// Returns the extra search steps for E. Refer to the paper.
+		function calcToRemove(a, b) {
+			var subLengths = 0;
+			for (var i = 0; i < a.table.length; i++) {
+				subLengths += a.table[i].table.length;
+			}
+			for (var i = 0; i < b.table.length; i++) {
+				subLengths += b.table[i].table.length;
+			}
+
+			var toRemove = a.table.length + b.table.length;
+			return toRemove - (Math.floor((subLengths - 1) / M) + 1);
+		}
+
+		// get2, set2 and saveSlot are helpers for accessing elements over two arrays.
+		function get2(a, b, index) {
+			return index < a.length ? a[index] : b[index - a.length];
+		}
+
+		function set2(a, b, index, value) {
+			if (index < a.length) {
+				a[index] = value;
+			} else {
+				b[index - a.length] = value;
+			}
+		}
+
+		function saveSlot(a, b, index, slot) {
+			set2(a.table, b.table, index, slot);
+
+			var l = index === 0 || index === a.lengths.length ? 0 : get2(a.lengths, a.lengths, index - 1);
+
+			set2(a.lengths, b.lengths, index, l + length(slot));
+		}
+
+		// Creates a node or leaf with a given length at their arrays for perfomance.
+		// Is only used by shuffle.
+		function createNode(h, length) {
+			if (length < 0) {
+				length = 0;
+			}
+			var a = {
+				ctor: '_Array',
+				height: h,
+				table: new Array(length)
+			};
+			if (h > 0) {
+				a.lengths = new Array(length);
+			}
+			return a;
+		}
+
+		// Returns an array of two balanced nodes.
+		function shuffle(a, b, toRemove) {
+			var newA = createNode(a.height, Math.min(M, a.table.length + b.table.length - toRemove));
+			var newB = createNode(a.height, newA.table.length - (a.table.length + b.table.length - toRemove));
+
+			// Skip the slots with size M. More precise: copy the slot references
+			// to the new node
+			var read = 0;
+			while (get2(a.table, b.table, read).table.length % M === 0) {
+				set2(newA.table, newB.table, read, get2(a.table, b.table, read));
+				set2(newA.lengths, newB.lengths, read, get2(a.lengths, b.lengths, read));
+				read++;
+			}
+
+			// Pulling items from left to right, caching in a slot before writing
+			// it into the new nodes.
+			var write = read;
+			var slot = new createNode(a.height - 1, 0);
+			var from = 0;
+
+			// If the current slot is still containing data, then there will be at
+			// least one more write, so we do not break this loop yet.
+			while (read - write - (slot.table.length > 0 ? 1 : 0) < toRemove) {
+				// Find out the max possible items for copying.
+				var source = get2(a.table, b.table, read);
+				var to = Math.min(M - slot.table.length, source.table.length);
+
+				// Copy and adjust size table.
+				slot.table = slot.table.concat(source.table.slice(from, to));
+				if (slot.height > 0) {
+					var len = slot.lengths.length;
+					for (var i = len; i < len + to - from; i++) {
+						slot.lengths[i] = length(slot.table[i]);
+						slot.lengths[i] += i > 0 ? slot.lengths[i - 1] : 0;
+					}
+				}
+
+				from += to;
+
+				// Only proceed to next slots[i] if the current one was
+				// fully copied.
+				if (source.table.length <= to) {
+					read++;from = 0;
+				}
+
+				// Only create a new slot if the current one is filled up.
+				if (slot.table.length === M) {
+					saveSlot(newA, newB, write, slot);
+					slot = createNode(a.height - 1, 0);
+					write++;
+				}
+			}
+
+			// Cleanup after the loop. Copy the last slot into the new nodes.
+			if (slot.table.length > 0) {
+				saveSlot(newA, newB, write, slot);
+				write++;
+			}
+
+			// Shift the untouched slots to the left
+			while (read < a.table.length + b.table.length) {
+				saveSlot(newA, newB, write, get2(a.table, b.table, read));
+				read++;
+				write++;
+			}
+
+			return [newA, newB];
+		}
+
+		// Navigation functions
+		function botRight(a) {
+			return a.table[a.table.length - 1];
+		}
+		function botLeft(a) {
+			return a.table[0];
+		}
+
+		// Copies a node for updating. Note that you should not use this if
+		// only updating only one of "table" or "lengths" for performance reasons.
+		function nodeCopy(a) {
+			var newA = {
+				ctor: '_Array',
+				height: a.height,
+				table: a.table.slice()
+			};
+			if (a.height > 0) {
+				newA.lengths = a.lengths.slice();
+			}
+			return newA;
+		}
+
+		// Returns how many items are in the tree.
+		function length(array) {
+			if (array.height === 0) {
+				return array.table.length;
+			} else {
+				return array.lengths[array.lengths.length - 1];
+			}
+		}
+
+		// Calculates in which slot of "table" the item probably is, then
+		// find the exact slot via forward searching in  "lengths". Returns the index.
+		function getSlot(i, a) {
+			var slot = i >> 5 * a.height;
+			while (a.lengths[slot] <= i) {
+				slot++;
+			}
+			return slot;
+		}
+
+		// Recursively creates a tree with a given height containing
+		// only the given item.
+		function create(item, h) {
+			if (h === 0) {
+				return {
+					ctor: '_Array',
+					height: 0,
+					table: [item]
+				};
+			}
+			return {
+				ctor: '_Array',
+				height: h,
+				table: [create(item, h - 1)],
+				lengths: [1]
+			};
+		}
+
+		// Recursively creates a tree that contains the given tree.
+		function parentise(tree, h) {
+			if (h === tree.height) {
+				return tree;
+			}
+
+			return {
+				ctor: '_Array',
+				height: h,
+				table: [parentise(tree, h - 1)],
+				lengths: [length(tree)]
+			};
+		}
+
+		// Emphasizes blood brotherhood beneath two trees.
+		function siblise(a, b) {
+			return {
+				ctor: '_Array',
+				height: a.height + 1,
+				table: [a, b],
+				lengths: [length(a), length(a) + length(b)]
+			};
+		}
+
+		function toJSArray(a) {
+			var jsArray = new Array(length(a));
+			toJSArray_(jsArray, 0, a);
+			return jsArray;
+		}
+
+		function toJSArray_(jsArray, i, a) {
+			for (var t = 0; t < a.table.length; t++) {
+				if (a.height === 0) {
+					jsArray[i + t] = a.table[t];
+				} else {
+					var inc = t === 0 ? 0 : a.lengths[t - 1];
+					toJSArray_(jsArray, i + inc, a.table[t]);
+				}
+			}
+		}
+
+		function fromJSArray(jsArray) {
+			if (jsArray.length === 0) {
+				return empty;
+			}
+			var h = Math.floor(Math.log(jsArray.length) / Math.log(M));
+			return fromJSArray_(jsArray, h, 0, jsArray.length);
+		}
+
+		function fromJSArray_(jsArray, h, from, to) {
+			if (h === 0) {
+				return {
+					ctor: '_Array',
+					height: 0,
+					table: jsArray.slice(from, to)
+				};
+			}
+
+			var step = Math.pow(M, h);
+			var table = new Array(Math.ceil((to - from) / step));
+			var lengths = new Array(table.length);
+			for (var i = 0; i < table.length; i++) {
+				table[i] = fromJSArray_(jsArray, h - 1, from + i * step, Math.min(from + (i + 1) * step, to));
+				lengths[i] = length(table[i]) + (i > 0 ? lengths[i - 1] : 0);
+			}
+			return {
+				ctor: '_Array',
+				height: h,
+				table: table,
+				lengths: lengths
+			};
+		}
+
+		return {
+			empty: empty,
+			fromList: fromList,
+			toList: toList,
+			initialize: F2(initialize),
+			append: F2(append),
+			push: F2(push),
+			slice: F3(slice),
+			get: F2(get),
+			set: F3(set),
+			map: F2(map),
+			indexedMap: F2(indexedMap),
+			foldl: F3(foldl),
+			foldr: F3(foldr),
+			length: length,
+
+			toJSArray: toJSArray,
+			fromJSArray: fromJSArray
+		};
+	}();
+	var _elm_lang$core$Array$append = _elm_lang$core$Native_Array.append;
+	var _elm_lang$core$Array$length = _elm_lang$core$Native_Array.length;
+	var _elm_lang$core$Array$isEmpty = function _elm_lang$core$Array$isEmpty(array) {
+		return _elm_lang$core$Native_Utils.eq(_elm_lang$core$Array$length(array), 0);
+	};
+	var _elm_lang$core$Array$slice = _elm_lang$core$Native_Array.slice;
+	var _elm_lang$core$Array$set = _elm_lang$core$Native_Array.set;
+	var _elm_lang$core$Array$get = F2(function (i, array) {
+		return _elm_lang$core$Native_Utils.cmp(0, i) < 1 && _elm_lang$core$Native_Utils.cmp(i, _elm_lang$core$Native_Array.length(array)) < 0 ? _elm_lang$core$Maybe$Just(A2(_elm_lang$core$Native_Array.get, i, array)) : _elm_lang$core$Maybe$Nothing;
+	});
+	var _elm_lang$core$Array$push = _elm_lang$core$Native_Array.push;
+	var _elm_lang$core$Array$empty = _elm_lang$core$Native_Array.empty;
+	var _elm_lang$core$Array$filter = F2(function (isOkay, arr) {
+		var update = F2(function (x, xs) {
+			return isOkay(x) ? A2(_elm_lang$core$Native_Array.push, x, xs) : xs;
+		});
+		return A3(_elm_lang$core$Native_Array.foldl, update, _elm_lang$core$Native_Array.empty, arr);
+	});
+	var _elm_lang$core$Array$foldr = _elm_lang$core$Native_Array.foldr;
+	var _elm_lang$core$Array$foldl = _elm_lang$core$Native_Array.foldl;
+	var _elm_lang$core$Array$indexedMap = _elm_lang$core$Native_Array.indexedMap;
+	var _elm_lang$core$Array$map = _elm_lang$core$Native_Array.map;
+	var _elm_lang$core$Array$toIndexedList = function _elm_lang$core$Array$toIndexedList(array) {
+		return A3(_elm_lang$core$List$map2, F2(function (v0, v1) {
+			return { ctor: '_Tuple2', _0: v0, _1: v1 };
+		}), A2(_elm_lang$core$List$range, 0, _elm_lang$core$Native_Array.length(array) - 1), _elm_lang$core$Native_Array.toList(array));
+	};
+	var _elm_lang$core$Array$toList = _elm_lang$core$Native_Array.toList;
+	var _elm_lang$core$Array$fromList = _elm_lang$core$Native_Array.fromList;
+	var _elm_lang$core$Array$initialize = _elm_lang$core$Native_Array.initialize;
+	var _elm_lang$core$Array$repeat = F2(function (n, e) {
+		return A2(_elm_lang$core$Array$initialize, n, _elm_lang$core$Basics$always(e));
+	});
+	var _elm_lang$core$Array$Array = { ctor: 'Array' };
+
 	//import Maybe, Native.Array, Native.List, Native.Utils, Result //
 
 	var _elm_lang$core$Native_Json = function () {
@@ -4479,6 +5739,268 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	var _elm_lang$core$Json_Decode$bool = _elm_lang$core$Native_Json.decodePrimitive('bool');
 	var _elm_lang$core$Json_Decode$string = _elm_lang$core$Native_Json.decodePrimitive('string');
 	var _elm_lang$core$Json_Decode$Decoder = { ctor: 'Decoder' };
+
+	var _elm_lang$http$Http$decodeUri = _elm_lang$http$Native_Http.decodeUri;
+	var _elm_lang$http$Http$encodeUri = _elm_lang$http$Native_Http.encodeUri;
+	var _elm_lang$http$Http$expectStringResponse = _elm_lang$http$Native_Http.expectStringResponse;
+	var _elm_lang$http$Http$expectJson = function _elm_lang$http$Http$expectJson(decoder) {
+		return _elm_lang$http$Http$expectStringResponse(function (response) {
+			return A2(_elm_lang$core$Json_Decode$decodeString, decoder, response.body);
+		});
+	};
+	var _elm_lang$http$Http$expectString = _elm_lang$http$Http$expectStringResponse(function (response) {
+		return _elm_lang$core$Result$Ok(response.body);
+	});
+	var _elm_lang$http$Http$multipartBody = _elm_lang$http$Native_Http.multipart;
+	var _elm_lang$http$Http$stringBody = _elm_lang$http$Http_Internal$StringBody;
+	var _elm_lang$http$Http$jsonBody = function _elm_lang$http$Http$jsonBody(value) {
+		return A2(_elm_lang$http$Http_Internal$StringBody, 'application/json', A2(_elm_lang$core$Json_Encode$encode, 0, value));
+	};
+	var _elm_lang$http$Http$emptyBody = _elm_lang$http$Http_Internal$EmptyBody;
+	var _elm_lang$http$Http$header = _elm_lang$http$Http_Internal$Header;
+	var _elm_lang$http$Http$request = _elm_lang$http$Http_Internal$Request;
+	var _elm_lang$http$Http$post = F3(function (url, body, decoder) {
+		return _elm_lang$http$Http$request({
+			method: 'POST',
+			headers: { ctor: '[]' },
+			url: url,
+			body: body,
+			expect: _elm_lang$http$Http$expectJson(decoder),
+			timeout: _elm_lang$core$Maybe$Nothing,
+			withCredentials: false
+		});
+	});
+	var _elm_lang$http$Http$get = F2(function (url, decoder) {
+		return _elm_lang$http$Http$request({
+			method: 'GET',
+			headers: { ctor: '[]' },
+			url: url,
+			body: _elm_lang$http$Http$emptyBody,
+			expect: _elm_lang$http$Http$expectJson(decoder),
+			timeout: _elm_lang$core$Maybe$Nothing,
+			withCredentials: false
+		});
+	});
+	var _elm_lang$http$Http$getString = function _elm_lang$http$Http$getString(url) {
+		return _elm_lang$http$Http$request({
+			method: 'GET',
+			headers: { ctor: '[]' },
+			url: url,
+			body: _elm_lang$http$Http$emptyBody,
+			expect: _elm_lang$http$Http$expectString,
+			timeout: _elm_lang$core$Maybe$Nothing,
+			withCredentials: false
+		});
+	};
+	var _elm_lang$http$Http$toTask = function _elm_lang$http$Http$toTask(_p0) {
+		var _p1 = _p0;
+		return A2(_elm_lang$http$Native_Http.toTask, _p1._0, _elm_lang$core$Maybe$Nothing);
+	};
+	var _elm_lang$http$Http$send = F2(function (resultToMessage, request) {
+		return A2(_elm_lang$core$Task$attempt, resultToMessage, _elm_lang$http$Http$toTask(request));
+	});
+	var _elm_lang$http$Http$Response = F4(function (a, b, c, d) {
+		return { url: a, status: b, headers: c, body: d };
+	});
+	var _elm_lang$http$Http$BadPayload = F2(function (a, b) {
+		return { ctor: 'BadPayload', _0: a, _1: b };
+	});
+	var _elm_lang$http$Http$BadStatus = function _elm_lang$http$Http$BadStatus(a) {
+		return { ctor: 'BadStatus', _0: a };
+	};
+	var _elm_lang$http$Http$NetworkError = { ctor: 'NetworkError' };
+	var _elm_lang$http$Http$Timeout = { ctor: 'Timeout' };
+	var _elm_lang$http$Http$BadUrl = function _elm_lang$http$Http$BadUrl(a) {
+		return { ctor: 'BadUrl', _0: a };
+	};
+	var _elm_lang$http$Http$StringPart = F2(function (a, b) {
+		return { ctor: 'StringPart', _0: a, _1: b };
+	});
+	var _elm_lang$http$Http$stringPart = _elm_lang$http$Http$StringPart;
+
+	var _agaviria$tuxedo$Models$initFormFields = { fname: '', lname: '', email: '', facebook: '', instagram: '', gplus: '', username: '', pass: '', cpass: '' };
+	var _agaviria$tuxedo$Models$initModel = function _agaviria$tuxedo$Models$initModel(route) {
+		return { currentUser: _elm_lang$core$Maybe$Nothing, jwt: _elm_lang$core$Maybe$Nothing, route: route, formFields: _agaviria$tuxedo$Models$initFormFields, flash: _elm_lang$core$Maybe$Nothing };
+	};
+	var _agaviria$tuxedo$Models$Model = F5(function (a, b, c, d, e) {
+		return { currentUser: a, jwt: b, route: c, formFields: d, flash: e };
+	});
+	var _agaviria$tuxedo$Models$FormFields = F9(function (a, b, c, d, e, f, g, h, i) {
+		return { fname: a, lname: b, email: c, facebook: d, instagram: e, gplus: f, username: g, pass: h, cpass: i };
+	});
+	var _agaviria$tuxedo$Models$User = F3(function (a, b, c) {
+		return { id: a, username: b, email: c };
+	});
+	var _agaviria$tuxedo$Models$Session = F2(function (a, b) {
+		return { user: a, jwt: b };
+	});
+	var _agaviria$tuxedo$Models$Flash = F2(function (a, b) {
+		return { message: a, flash_type: b };
+	});
+	var _agaviria$tuxedo$Models$NotFoundPage = { ctor: 'NotFoundPage' };
+	var _agaviria$tuxedo$Models$SignupPage = { ctor: 'SignupPage' };
+	var _agaviria$tuxedo$Models$IndexPage = { ctor: 'IndexPage' };
+
+	var _elm_lang$dom$Native_Dom = function () {
+
+		var fakeNode = {
+			addEventListener: function addEventListener() {},
+			removeEventListener: function removeEventListener() {}
+		};
+
+		var onDocument = on(typeof document !== 'undefined' ? document : fakeNode);
+		var onWindow = on(typeof window !== 'undefined' ? window : fakeNode);
+
+		function on(node) {
+			return function (eventName, decoder, toTask) {
+				return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+
+					function performTask(event) {
+						var result = A2(_elm_lang$core$Json_Decode$decodeValue, decoder, event);
+						if (result.ctor === 'Ok') {
+							_elm_lang$core$Native_Scheduler.rawSpawn(toTask(result._0));
+						}
+					}
+
+					node.addEventListener(eventName, performTask);
+
+					return function () {
+						node.removeEventListener(eventName, performTask);
+					};
+				});
+			};
+		}
+
+		var rAF = typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame : function (callback) {
+			callback();
+		};
+
+		function withNode(id, doStuff) {
+			return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+				rAF(function () {
+					var node = document.getElementById(id);
+					if (node === null) {
+						callback(_elm_lang$core$Native_Scheduler.fail({ ctor: 'NotFound', _0: id }));
+						return;
+					}
+					callback(_elm_lang$core$Native_Scheduler.succeed(doStuff(node)));
+				});
+			});
+		}
+
+		// FOCUS
+
+		function focus(id) {
+			return withNode(id, function (node) {
+				node.focus();
+				return _elm_lang$core$Native_Utils.Tuple0;
+			});
+		}
+
+		function blur(id) {
+			return withNode(id, function (node) {
+				node.blur();
+				return _elm_lang$core$Native_Utils.Tuple0;
+			});
+		}
+
+		// SCROLLING
+
+		function getScrollTop(id) {
+			return withNode(id, function (node) {
+				return node.scrollTop;
+			});
+		}
+
+		function setScrollTop(id, desiredScrollTop) {
+			return withNode(id, function (node) {
+				node.scrollTop = desiredScrollTop;
+				return _elm_lang$core$Native_Utils.Tuple0;
+			});
+		}
+
+		function toBottom(id) {
+			return withNode(id, function (node) {
+				node.scrollTop = node.scrollHeight;
+				return _elm_lang$core$Native_Utils.Tuple0;
+			});
+		}
+
+		function getScrollLeft(id) {
+			return withNode(id, function (node) {
+				return node.scrollLeft;
+			});
+		}
+
+		function setScrollLeft(id, desiredScrollLeft) {
+			return withNode(id, function (node) {
+				node.scrollLeft = desiredScrollLeft;
+				return _elm_lang$core$Native_Utils.Tuple0;
+			});
+		}
+
+		function toRight(id) {
+			return withNode(id, function (node) {
+				node.scrollLeft = node.scrollWidth;
+				return _elm_lang$core$Native_Utils.Tuple0;
+			});
+		}
+
+		// SIZE
+
+		function width(options, id) {
+			return withNode(id, function (node) {
+				switch (options.ctor) {
+					case 'Content':
+						return node.scrollWidth;
+					case 'VisibleContent':
+						return node.clientWidth;
+					case 'VisibleContentWithBorders':
+						return node.offsetWidth;
+					case 'VisibleContentWithBordersAndMargins':
+						var rect = node.getBoundingClientRect();
+						return rect.right - rect.left;
+				}
+			});
+		}
+
+		function height(options, id) {
+			return withNode(id, function (node) {
+				switch (options.ctor) {
+					case 'Content':
+						return node.scrollHeight;
+					case 'VisibleContent':
+						return node.clientHeight;
+					case 'VisibleContentWithBorders':
+						return node.offsetHeight;
+					case 'VisibleContentWithBordersAndMargins':
+						var rect = node.getBoundingClientRect();
+						return rect.bottom - rect.top;
+				}
+			});
+		}
+
+		return {
+			onDocument: F3(onDocument),
+			onWindow: F3(onWindow),
+
+			focus: focus,
+			blur: blur,
+
+			getScrollTop: getScrollTop,
+			setScrollTop: F2(setScrollTop),
+			getScrollLeft: getScrollLeft,
+			setScrollLeft: F2(setScrollLeft),
+			toBottom: toBottom,
+			toRight: toRight,
+
+			height: F2(height),
+			width: F2(width)
+		};
+	}();
+
+	var _elm_lang$dom$Dom_LowLevel$onWindow = _elm_lang$dom$Native_Dom.onWindow;
+	var _elm_lang$dom$Dom_LowLevel$onDocument = _elm_lang$dom$Native_Dom.onDocument;
 
 	var _elm_lang$virtual_dom$VirtualDom_Debug$wrap;
 	var _elm_lang$virtual_dom$VirtualDom_Debug$wrapWithFlags;
@@ -6002,835 +7524,6 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		};
 	}();
 
-	//import Native.Utils //
-
-	var _elm_lang$core$Native_Scheduler = function () {
-
-		var MAX_STEPS = 10000;
-
-		// TASKS
-
-		function succeed(value) {
-			return {
-				ctor: '_Task_succeed',
-				value: value
-			};
-		}
-
-		function fail(error) {
-			return {
-				ctor: '_Task_fail',
-				value: error
-			};
-		}
-
-		function nativeBinding(callback) {
-			return {
-				ctor: '_Task_nativeBinding',
-				callback: callback,
-				cancel: null
-			};
-		}
-
-		function andThen(callback, task) {
-			return {
-				ctor: '_Task_andThen',
-				callback: callback,
-				task: task
-			};
-		}
-
-		function onError(callback, task) {
-			return {
-				ctor: '_Task_onError',
-				callback: callback,
-				task: task
-			};
-		}
-
-		function receive(callback) {
-			return {
-				ctor: '_Task_receive',
-				callback: callback
-			};
-		}
-
-		// PROCESSES
-
-		function rawSpawn(task) {
-			var process = {
-				ctor: '_Process',
-				id: _elm_lang$core$Native_Utils.guid(),
-				root: task,
-				stack: null,
-				mailbox: []
-			};
-
-			enqueue(process);
-
-			return process;
-		}
-
-		function spawn(task) {
-			return nativeBinding(function (callback) {
-				var process = rawSpawn(task);
-				callback(succeed(process));
-			});
-		}
-
-		function rawSend(process, msg) {
-			process.mailbox.push(msg);
-			enqueue(process);
-		}
-
-		function send(process, msg) {
-			return nativeBinding(function (callback) {
-				rawSend(process, msg);
-				callback(succeed(_elm_lang$core$Native_Utils.Tuple0));
-			});
-		}
-
-		function kill(process) {
-			return nativeBinding(function (callback) {
-				var root = process.root;
-				if (root.ctor === '_Task_nativeBinding' && root.cancel) {
-					root.cancel();
-				}
-
-				process.root = null;
-
-				callback(succeed(_elm_lang$core$Native_Utils.Tuple0));
-			});
-		}
-
-		function sleep(time) {
-			return nativeBinding(function (callback) {
-				var id = setTimeout(function () {
-					callback(succeed(_elm_lang$core$Native_Utils.Tuple0));
-				}, time);
-
-				return function () {
-					clearTimeout(id);
-				};
-			});
-		}
-
-		// STEP PROCESSES
-
-		function step(numSteps, process) {
-			while (numSteps < MAX_STEPS) {
-				var ctor = process.root.ctor;
-
-				if (ctor === '_Task_succeed') {
-					while (process.stack && process.stack.ctor === '_Task_onError') {
-						process.stack = process.stack.rest;
-					}
-					if (process.stack === null) {
-						break;
-					}
-					process.root = process.stack.callback(process.root.value);
-					process.stack = process.stack.rest;
-					++numSteps;
-					continue;
-				}
-
-				if (ctor === '_Task_fail') {
-					while (process.stack && process.stack.ctor === '_Task_andThen') {
-						process.stack = process.stack.rest;
-					}
-					if (process.stack === null) {
-						break;
-					}
-					process.root = process.stack.callback(process.root.value);
-					process.stack = process.stack.rest;
-					++numSteps;
-					continue;
-				}
-
-				if (ctor === '_Task_andThen') {
-					process.stack = {
-						ctor: '_Task_andThen',
-						callback: process.root.callback,
-						rest: process.stack
-					};
-					process.root = process.root.task;
-					++numSteps;
-					continue;
-				}
-
-				if (ctor === '_Task_onError') {
-					process.stack = {
-						ctor: '_Task_onError',
-						callback: process.root.callback,
-						rest: process.stack
-					};
-					process.root = process.root.task;
-					++numSteps;
-					continue;
-				}
-
-				if (ctor === '_Task_nativeBinding') {
-					process.root.cancel = process.root.callback(function (newRoot) {
-						process.root = newRoot;
-						enqueue(process);
-					});
-
-					break;
-				}
-
-				if (ctor === '_Task_receive') {
-					var mailbox = process.mailbox;
-					if (mailbox.length === 0) {
-						break;
-					}
-
-					process.root = process.root.callback(mailbox.shift());
-					++numSteps;
-					continue;
-				}
-
-				throw new Error(ctor);
-			}
-
-			if (numSteps < MAX_STEPS) {
-				return numSteps + 1;
-			}
-			enqueue(process);
-
-			return numSteps;
-		}
-
-		// WORK QUEUE
-
-		var working = false;
-		var workQueue = [];
-
-		function enqueue(process) {
-			workQueue.push(process);
-
-			if (!working) {
-				setTimeout(work, 0);
-				working = true;
-			}
-		}
-
-		function work() {
-			var numSteps = 0;
-			var process;
-			while (numSteps < MAX_STEPS && (process = workQueue.shift())) {
-				if (process.root) {
-					numSteps = step(numSteps, process);
-				}
-			}
-			if (!process) {
-				working = false;
-				return;
-			}
-			setTimeout(work, 0);
-		}
-
-		return {
-			succeed: succeed,
-			fail: fail,
-			nativeBinding: nativeBinding,
-			andThen: F2(andThen),
-			onError: F2(onError),
-			receive: receive,
-
-			spawn: spawn,
-			kill: kill,
-			sleep: sleep,
-			send: F2(send),
-
-			rawSpawn: rawSpawn,
-			rawSend: rawSend
-		};
-	}();
-	//import //
-
-	var _elm_lang$core$Native_Platform = function () {
-
-		// PROGRAMS
-
-		function program(impl) {
-			return function (flagDecoder) {
-				return function (object, moduleName) {
-					object['worker'] = function worker(flags) {
-						if (typeof flags !== 'undefined') {
-							throw new Error('The `' + moduleName + '` module does not need flags.\n' + 'Call ' + moduleName + '.worker() with no arguments and you should be all set!');
-						}
-
-						return initialize(impl.init, impl.update, impl.subscriptions, renderer);
-					};
-				};
-			};
-		}
-
-		function programWithFlags(impl) {
-			return function (flagDecoder) {
-				return function (object, moduleName) {
-					object['worker'] = function worker(flags) {
-						if (typeof flagDecoder === 'undefined') {
-							throw new Error('Are you trying to sneak a Never value into Elm? Trickster!\n' + 'It looks like ' + moduleName + '.main is defined with `programWithFlags` but has type `Program Never`.\n' + 'Use `program` instead if you do not want flags.');
-						}
-
-						var result = A2(_elm_lang$core$Native_Json.run, flagDecoder, flags);
-						if (result.ctor === 'Err') {
-							throw new Error(moduleName + '.worker(...) was called with an unexpected argument.\n' + 'I tried to convert it to an Elm value, but ran into this problem:\n\n' + result._0);
-						}
-
-						return initialize(impl.init(result._0), impl.update, impl.subscriptions, renderer);
-					};
-				};
-			};
-		}
-
-		function renderer(enqueue, _) {
-			return function (_) {};
-		}
-
-		// HTML TO PROGRAM
-
-		function htmlToProgram(vnode) {
-			var emptyBag = batch(_elm_lang$core$Native_List.Nil);
-			var noChange = _elm_lang$core$Native_Utils.Tuple2(_elm_lang$core$Native_Utils.Tuple0, emptyBag);
-
-			return _elm_lang$virtual_dom$VirtualDom$program({
-				init: noChange,
-				view: function view(model) {
-					return main;
-				},
-				update: F2(function (msg, model) {
-					return noChange;
-				}),
-				subscriptions: function subscriptions(model) {
-					return emptyBag;
-				}
-			});
-		}
-
-		// INITIALIZE A PROGRAM
-
-		function initialize(init, update, subscriptions, renderer) {
-			// ambient state
-			var managers = {};
-			var updateView;
-
-			// init and update state in main process
-			var initApp = _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
-				var model = init._0;
-				updateView = renderer(enqueue, model);
-				var cmds = init._1;
-				var subs = subscriptions(model);
-				dispatchEffects(managers, cmds, subs);
-				callback(_elm_lang$core$Native_Scheduler.succeed(model));
-			});
-
-			function onMessage(msg, model) {
-				return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
-					var results = A2(update, msg, model);
-					model = results._0;
-					updateView(model);
-					var cmds = results._1;
-					var subs = subscriptions(model);
-					dispatchEffects(managers, cmds, subs);
-					callback(_elm_lang$core$Native_Scheduler.succeed(model));
-				});
-			}
-
-			var mainProcess = spawnLoop(initApp, onMessage);
-
-			function enqueue(msg) {
-				_elm_lang$core$Native_Scheduler.rawSend(mainProcess, msg);
-			}
-
-			var ports = setupEffects(managers, enqueue);
-
-			return ports ? { ports: ports } : {};
-		}
-
-		// EFFECT MANAGERS
-
-		var effectManagers = {};
-
-		function setupEffects(managers, callback) {
-			var ports;
-
-			// setup all necessary effect managers
-			for (var key in effectManagers) {
-				var manager = effectManagers[key];
-
-				if (manager.isForeign) {
-					ports = ports || {};
-					ports[key] = manager.tag === 'cmd' ? setupOutgoingPort(key) : setupIncomingPort(key, callback);
-				}
-
-				managers[key] = makeManager(manager, callback);
-			}
-
-			return ports;
-		}
-
-		function makeManager(info, callback) {
-			var router = {
-				main: callback,
-				self: undefined
-			};
-
-			var tag = info.tag;
-			var onEffects = info.onEffects;
-			var onSelfMsg = info.onSelfMsg;
-
-			function onMessage(msg, state) {
-				if (msg.ctor === 'self') {
-					return A3(onSelfMsg, router, msg._0, state);
-				}
-
-				var fx = msg._0;
-				switch (tag) {
-					case 'cmd':
-						return A3(onEffects, router, fx.cmds, state);
-
-					case 'sub':
-						return A3(onEffects, router, fx.subs, state);
-
-					case 'fx':
-						return A4(onEffects, router, fx.cmds, fx.subs, state);
-				}
-			}
-
-			var process = spawnLoop(info.init, onMessage);
-			router.self = process;
-			return process;
-		}
-
-		function sendToApp(router, msg) {
-			return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
-				router.main(msg);
-				callback(_elm_lang$core$Native_Scheduler.succeed(_elm_lang$core$Native_Utils.Tuple0));
-			});
-		}
-
-		function sendToSelf(router, msg) {
-			return A2(_elm_lang$core$Native_Scheduler.send, router.self, {
-				ctor: 'self',
-				_0: msg
-			});
-		}
-
-		// HELPER for STATEFUL LOOPS
-
-		function spawnLoop(init, onMessage) {
-			var andThen = _elm_lang$core$Native_Scheduler.andThen;
-
-			function loop(state) {
-				var handleMsg = _elm_lang$core$Native_Scheduler.receive(function (msg) {
-					return onMessage(msg, state);
-				});
-				return A2(andThen, loop, handleMsg);
-			}
-
-			var task = A2(andThen, loop, init);
-
-			return _elm_lang$core$Native_Scheduler.rawSpawn(task);
-		}
-
-		// BAGS
-
-		function leaf(home) {
-			return function (value) {
-				return {
-					type: 'leaf',
-					home: home,
-					value: value
-				};
-			};
-		}
-
-		function batch(list) {
-			return {
-				type: 'node',
-				branches: list
-			};
-		}
-
-		function map(tagger, bag) {
-			return {
-				type: 'map',
-				tagger: tagger,
-				tree: bag
-			};
-		}
-
-		// PIPE BAGS INTO EFFECT MANAGERS
-
-		function dispatchEffects(managers, cmdBag, subBag) {
-			var effectsDict = {};
-			gatherEffects(true, cmdBag, effectsDict, null);
-			gatherEffects(false, subBag, effectsDict, null);
-
-			for (var home in managers) {
-				var fx = home in effectsDict ? effectsDict[home] : {
-					cmds: _elm_lang$core$Native_List.Nil,
-					subs: _elm_lang$core$Native_List.Nil
-				};
-
-				_elm_lang$core$Native_Scheduler.rawSend(managers[home], { ctor: 'fx', _0: fx });
-			}
-		}
-
-		function gatherEffects(isCmd, bag, effectsDict, taggers) {
-			switch (bag.type) {
-				case 'leaf':
-					var home = bag.home;
-					var effect = toEffect(isCmd, home, taggers, bag.value);
-					effectsDict[home] = insert(isCmd, effect, effectsDict[home]);
-					return;
-
-				case 'node':
-					var list = bag.branches;
-					while (list.ctor !== '[]') {
-						gatherEffects(isCmd, list._0, effectsDict, taggers);
-						list = list._1;
-					}
-					return;
-
-				case 'map':
-					gatherEffects(isCmd, bag.tree, effectsDict, {
-						tagger: bag.tagger,
-						rest: taggers
-					});
-					return;
-			}
-		}
-
-		function toEffect(isCmd, home, taggers, value) {
-			function applyTaggers(x) {
-				var temp = taggers;
-				while (temp) {
-					x = temp.tagger(x);
-					temp = temp.rest;
-				}
-				return x;
-			}
-
-			var map = isCmd ? effectManagers[home].cmdMap : effectManagers[home].subMap;
-
-			return A2(map, applyTaggers, value);
-		}
-
-		function insert(isCmd, newEffect, effects) {
-			effects = effects || {
-				cmds: _elm_lang$core$Native_List.Nil,
-				subs: _elm_lang$core$Native_List.Nil
-			};
-			if (isCmd) {
-				effects.cmds = _elm_lang$core$Native_List.Cons(newEffect, effects.cmds);
-				return effects;
-			}
-			effects.subs = _elm_lang$core$Native_List.Cons(newEffect, effects.subs);
-			return effects;
-		}
-
-		// PORTS
-
-		function checkPortName(name) {
-			if (name in effectManagers) {
-				throw new Error('There can only be one port named `' + name + '`, but your program has multiple.');
-			}
-		}
-
-		// OUTGOING PORTS
-
-		function outgoingPort(name, converter) {
-			checkPortName(name);
-			effectManagers[name] = {
-				tag: 'cmd',
-				cmdMap: outgoingPortMap,
-				converter: converter,
-				isForeign: true
-			};
-			return leaf(name);
-		}
-
-		var outgoingPortMap = F2(function cmdMap(tagger, value) {
-			return value;
-		});
-
-		function setupOutgoingPort(name) {
-			var subs = [];
-			var converter = effectManagers[name].converter;
-
-			// CREATE MANAGER
-
-			var init = _elm_lang$core$Native_Scheduler.succeed(null);
-
-			function onEffects(router, cmdList, state) {
-				while (cmdList.ctor !== '[]') {
-					// grab a separate reference to subs in case unsubscribe is called
-					var currentSubs = subs;
-					var value = converter(cmdList._0);
-					for (var i = 0; i < currentSubs.length; i++) {
-						currentSubs[i](value);
-					}
-					cmdList = cmdList._1;
-				}
-				return init;
-			}
-
-			effectManagers[name].init = init;
-			effectManagers[name].onEffects = F3(onEffects);
-
-			// PUBLIC API
-
-			function subscribe(callback) {
-				subs.push(callback);
-			}
-
-			function unsubscribe(callback) {
-				// copy subs into a new array in case unsubscribe is called within a
-				// subscribed callback
-				subs = subs.slice();
-				var index = subs.indexOf(callback);
-				if (index >= 0) {
-					subs.splice(index, 1);
-				}
-			}
-
-			return {
-				subscribe: subscribe,
-				unsubscribe: unsubscribe
-			};
-		}
-
-		// INCOMING PORTS
-
-		function incomingPort(name, converter) {
-			checkPortName(name);
-			effectManagers[name] = {
-				tag: 'sub',
-				subMap: incomingPortMap,
-				converter: converter,
-				isForeign: true
-			};
-			return leaf(name);
-		}
-
-		var incomingPortMap = F2(function subMap(tagger, finalTagger) {
-			return function (value) {
-				return tagger(finalTagger(value));
-			};
-		});
-
-		function setupIncomingPort(name, callback) {
-			var sentBeforeInit = [];
-			var subs = _elm_lang$core$Native_List.Nil;
-			var converter = effectManagers[name].converter;
-			var currentOnEffects = preInitOnEffects;
-			var currentSend = preInitSend;
-
-			// CREATE MANAGER
-
-			var init = _elm_lang$core$Native_Scheduler.succeed(null);
-
-			function preInitOnEffects(router, subList, state) {
-				var postInitResult = postInitOnEffects(router, subList, state);
-
-				for (var i = 0; i < sentBeforeInit.length; i++) {
-					postInitSend(sentBeforeInit[i]);
-				}
-
-				sentBeforeInit = null; // to release objects held in queue
-				currentSend = postInitSend;
-				currentOnEffects = postInitOnEffects;
-				return postInitResult;
-			}
-
-			function postInitOnEffects(router, subList, state) {
-				subs = subList;
-				return init;
-			}
-
-			function onEffects(router, subList, state) {
-				return currentOnEffects(router, subList, state);
-			}
-
-			effectManagers[name].init = init;
-			effectManagers[name].onEffects = F3(onEffects);
-
-			// PUBLIC API
-
-			function preInitSend(value) {
-				sentBeforeInit.push(value);
-			}
-
-			function postInitSend(value) {
-				var temp = subs;
-				while (temp.ctor !== '[]') {
-					callback(temp._0(value));
-					temp = temp._1;
-				}
-			}
-
-			function send(incomingValue) {
-				var result = A2(_elm_lang$core$Json_Decode$decodeValue, converter, incomingValue);
-				if (result.ctor === 'Err') {
-					throw new Error('Trying to send an unexpected type of value through port `' + name + '`:\n' + result._0);
-				}
-
-				currentSend(result._0);
-			}
-
-			return { send: send };
-		}
-
-		return {
-			// routers
-			sendToApp: F2(sendToApp),
-			sendToSelf: F2(sendToSelf),
-
-			// global setup
-			effectManagers: effectManagers,
-			outgoingPort: outgoingPort,
-			incomingPort: incomingPort,
-
-			htmlToProgram: htmlToProgram,
-			program: program,
-			programWithFlags: programWithFlags,
-			initialize: initialize,
-
-			// effect bags
-			leaf: leaf,
-			batch: batch,
-			map: F2(map)
-		};
-	}();
-
-	var _elm_lang$core$Platform_Cmd$batch = _elm_lang$core$Native_Platform.batch;
-	var _elm_lang$core$Platform_Cmd$none = _elm_lang$core$Platform_Cmd$batch({ ctor: '[]' });
-	var _elm_lang$core$Platform_Cmd_ops = _elm_lang$core$Platform_Cmd_ops || {};
-	_elm_lang$core$Platform_Cmd_ops['!'] = F2(function (model, commands) {
-		return {
-			ctor: '_Tuple2',
-			_0: model,
-			_1: _elm_lang$core$Platform_Cmd$batch(commands)
-		};
-	});
-	var _elm_lang$core$Platform_Cmd$map = _elm_lang$core$Native_Platform.map;
-	var _elm_lang$core$Platform_Cmd$Cmd = { ctor: 'Cmd' };
-
-	var _elm_lang$core$Platform_Sub$batch = _elm_lang$core$Native_Platform.batch;
-	var _elm_lang$core$Platform_Sub$none = _elm_lang$core$Platform_Sub$batch({ ctor: '[]' });
-	var _elm_lang$core$Platform_Sub$map = _elm_lang$core$Native_Platform.map;
-	var _elm_lang$core$Platform_Sub$Sub = { ctor: 'Sub' };
-
-	var _elm_lang$core$Platform$hack = _elm_lang$core$Native_Scheduler.succeed;
-	var _elm_lang$core$Platform$sendToSelf = _elm_lang$core$Native_Platform.sendToSelf;
-	var _elm_lang$core$Platform$sendToApp = _elm_lang$core$Native_Platform.sendToApp;
-	var _elm_lang$core$Platform$programWithFlags = _elm_lang$core$Native_Platform.programWithFlags;
-	var _elm_lang$core$Platform$program = _elm_lang$core$Native_Platform.program;
-	var _elm_lang$core$Platform$Program = { ctor: 'Program' };
-	var _elm_lang$core$Platform$Task = { ctor: 'Task' };
-	var _elm_lang$core$Platform$ProcessId = { ctor: 'ProcessId' };
-	var _elm_lang$core$Platform$Router = { ctor: 'Router' };
-
-	var _elm_lang$core$Task$onError = _elm_lang$core$Native_Scheduler.onError;
-	var _elm_lang$core$Task$andThen = _elm_lang$core$Native_Scheduler.andThen;
-	var _elm_lang$core$Task$spawnCmd = F2(function (router, _p0) {
-		var _p1 = _p0;
-		return _elm_lang$core$Native_Scheduler.spawn(A2(_elm_lang$core$Task$andThen, _elm_lang$core$Platform$sendToApp(router), _p1._0));
-	});
-	var _elm_lang$core$Task$fail = _elm_lang$core$Native_Scheduler.fail;
-	var _elm_lang$core$Task$mapError = F2(function (convert, task) {
-		return A2(_elm_lang$core$Task$onError, function (_p2) {
-			return _elm_lang$core$Task$fail(convert(_p2));
-		}, task);
-	});
-	var _elm_lang$core$Task$succeed = _elm_lang$core$Native_Scheduler.succeed;
-	var _elm_lang$core$Task$map = F2(function (func, taskA) {
-		return A2(_elm_lang$core$Task$andThen, function (a) {
-			return _elm_lang$core$Task$succeed(func(a));
-		}, taskA);
-	});
-	var _elm_lang$core$Task$map2 = F3(function (func, taskA, taskB) {
-		return A2(_elm_lang$core$Task$andThen, function (a) {
-			return A2(_elm_lang$core$Task$andThen, function (b) {
-				return _elm_lang$core$Task$succeed(A2(func, a, b));
-			}, taskB);
-		}, taskA);
-	});
-	var _elm_lang$core$Task$map3 = F4(function (func, taskA, taskB, taskC) {
-		return A2(_elm_lang$core$Task$andThen, function (a) {
-			return A2(_elm_lang$core$Task$andThen, function (b) {
-				return A2(_elm_lang$core$Task$andThen, function (c) {
-					return _elm_lang$core$Task$succeed(A3(func, a, b, c));
-				}, taskC);
-			}, taskB);
-		}, taskA);
-	});
-	var _elm_lang$core$Task$map4 = F5(function (func, taskA, taskB, taskC, taskD) {
-		return A2(_elm_lang$core$Task$andThen, function (a) {
-			return A2(_elm_lang$core$Task$andThen, function (b) {
-				return A2(_elm_lang$core$Task$andThen, function (c) {
-					return A2(_elm_lang$core$Task$andThen, function (d) {
-						return _elm_lang$core$Task$succeed(A4(func, a, b, c, d));
-					}, taskD);
-				}, taskC);
-			}, taskB);
-		}, taskA);
-	});
-	var _elm_lang$core$Task$map5 = F6(function (func, taskA, taskB, taskC, taskD, taskE) {
-		return A2(_elm_lang$core$Task$andThen, function (a) {
-			return A2(_elm_lang$core$Task$andThen, function (b) {
-				return A2(_elm_lang$core$Task$andThen, function (c) {
-					return A2(_elm_lang$core$Task$andThen, function (d) {
-						return A2(_elm_lang$core$Task$andThen, function (e) {
-							return _elm_lang$core$Task$succeed(A5(func, a, b, c, d, e));
-						}, taskE);
-					}, taskD);
-				}, taskC);
-			}, taskB);
-		}, taskA);
-	});
-	var _elm_lang$core$Task$sequence = function _elm_lang$core$Task$sequence(tasks) {
-		var _p3 = tasks;
-		if (_p3.ctor === '[]') {
-			return _elm_lang$core$Task$succeed({ ctor: '[]' });
-		} else {
-			return A3(_elm_lang$core$Task$map2, F2(function (x, y) {
-				return { ctor: '::', _0: x, _1: y };
-			}), _p3._0, _elm_lang$core$Task$sequence(_p3._1));
-		}
-	};
-	var _elm_lang$core$Task$onEffects = F3(function (router, commands, state) {
-		return A2(_elm_lang$core$Task$map, function (_p4) {
-			return { ctor: '_Tuple0' };
-		}, _elm_lang$core$Task$sequence(A2(_elm_lang$core$List$map, _elm_lang$core$Task$spawnCmd(router), commands)));
-	});
-	var _elm_lang$core$Task$init = _elm_lang$core$Task$succeed({ ctor: '_Tuple0' });
-	var _elm_lang$core$Task$onSelfMsg = F3(function (_p7, _p6, _p5) {
-		return _elm_lang$core$Task$succeed({ ctor: '_Tuple0' });
-	});
-	var _elm_lang$core$Task$command = _elm_lang$core$Native_Platform.leaf('Task');
-	var _elm_lang$core$Task$Perform = function _elm_lang$core$Task$Perform(a) {
-		return { ctor: 'Perform', _0: a };
-	};
-	var _elm_lang$core$Task$perform = F2(function (toMessage, task) {
-		return _elm_lang$core$Task$command(_elm_lang$core$Task$Perform(A2(_elm_lang$core$Task$map, toMessage, task)));
-	});
-	var _elm_lang$core$Task$attempt = F2(function (resultToMessage, task) {
-		return _elm_lang$core$Task$command(_elm_lang$core$Task$Perform(A2(_elm_lang$core$Task$onError, function (_p8) {
-			return _elm_lang$core$Task$succeed(resultToMessage(_elm_lang$core$Result$Err(_p8)));
-		}, A2(_elm_lang$core$Task$andThen, function (_p9) {
-			return _elm_lang$core$Task$succeed(resultToMessage(_elm_lang$core$Result$Ok(_p9)));
-		}, task))));
-	});
-	var _elm_lang$core$Task$cmdMap = F2(function (tagger, _p10) {
-		var _p11 = _p10;
-		return _elm_lang$core$Task$Perform(A2(_elm_lang$core$Task$map, tagger, _p11._0));
-	});
-	_elm_lang$core$Native_Platform.effectManagers['Task'] = { pkg: 'elm-lang/core', init: _elm_lang$core$Task$init, onEffects: _elm_lang$core$Task$onEffects, onSelfMsg: _elm_lang$core$Task$onSelfMsg, tag: 'cmd', cmdMap: _elm_lang$core$Task$cmdMap };
-
 	var _elm_lang$virtual_dom$Native_Debug = function () {
 
 		// IMPORT / EXPORT
@@ -7058,34 +7751,6 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 			init: init
 		};
 	}();
-
-	var _elm_lang$core$Debug$crash = _elm_lang$core$Native_Debug.crash;
-	var _elm_lang$core$Debug$log = _elm_lang$core$Native_Debug.log;
-
-	var _elm_lang$core$Tuple$mapSecond = F2(function (func, _p0) {
-		var _p1 = _p0;
-		return {
-			ctor: '_Tuple2',
-			_0: _p1._0,
-			_1: func(_p1._1)
-		};
-	});
-	var _elm_lang$core$Tuple$mapFirst = F2(function (func, _p2) {
-		var _p3 = _p2;
-		return {
-			ctor: '_Tuple2',
-			_0: func(_p3._0),
-			_1: _p3._1
-		};
-	});
-	var _elm_lang$core$Tuple$second = function _elm_lang$core$Tuple$second(_p4) {
-		var _p5 = _p4;
-		return _p5._1;
-	};
-	var _elm_lang$core$Tuple$first = function _elm_lang$core$Tuple$first(_p6) {
-		var _p7 = _p6;
-		return _p7._0;
-	};
 
 	var _elm_lang$virtual_dom$VirtualDom_Helpers$keyedNode = _elm_lang$virtual_dom$Native_VirtualDom.keyedNode;
 	var _elm_lang$virtual_dom$VirtualDom_Helpers$lazy3 = _elm_lang$virtual_dom$Native_VirtualDom.lazy3;
@@ -9854,6 +10519,855 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	var _elm_lang$html$Html$menuitem = _elm_lang$html$Html$node('menuitem');
 	var _elm_lang$html$Html$menu = _elm_lang$html$Html$node('menu');
 
+	var _elm_lang$navigation$Native_Navigation = function () {
+
+		// FAKE NAVIGATION
+
+		function go(n) {
+			return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+				if (n !== 0) {
+					history.go(n);
+				}
+				callback(_elm_lang$core$Native_Scheduler.succeed(_elm_lang$core$Native_Utils.Tuple0));
+			});
+		}
+
+		function pushState(url) {
+			return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+				history.pushState({}, '', url);
+				callback(_elm_lang$core$Native_Scheduler.succeed(getLocation()));
+			});
+		}
+
+		function replaceState(url) {
+			return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+				history.replaceState({}, '', url);
+				callback(_elm_lang$core$Native_Scheduler.succeed(getLocation()));
+			});
+		}
+
+		// REAL NAVIGATION
+
+		function reloadPage(skipCache) {
+			return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+				document.location.reload(skipCache);
+				callback(_elm_lang$core$Native_Scheduler.succeed(_elm_lang$core$Native_Utils.Tuple0));
+			});
+		}
+
+		function setLocation(url) {
+			return _elm_lang$core$Native_Scheduler.nativeBinding(function (callback) {
+				try {
+					window.location = url;
+				} catch (err) {
+					// Only Firefox can throw a NS_ERROR_MALFORMED_URI exception here.
+					// Other browsers reload the page, so let's be consistent about that.
+					document.location.reload(false);
+				}
+				callback(_elm_lang$core$Native_Scheduler.succeed(_elm_lang$core$Native_Utils.Tuple0));
+			});
+		}
+
+		// GET LOCATION
+
+		function getLocation() {
+			var location = document.location;
+
+			return {
+				href: location.href,
+				host: location.host,
+				hostname: location.hostname,
+				protocol: location.protocol,
+				origin: location.origin,
+				port_: location.port,
+				pathname: location.pathname,
+				search: location.search,
+				hash: location.hash,
+				username: location.username,
+				password: location.password
+			};
+		}
+
+		// DETECT IE11 PROBLEMS
+
+		function isInternetExplorer11() {
+			return window.navigator.userAgent.indexOf('Trident') !== -1;
+		}
+
+		return {
+			go: go,
+			setLocation: setLocation,
+			reloadPage: reloadPage,
+			pushState: pushState,
+			replaceState: replaceState,
+			getLocation: getLocation,
+			isInternetExplorer11: isInternetExplorer11
+		};
+	}();
+
+	var _elm_lang$core$Process$kill = _elm_lang$core$Native_Scheduler.kill;
+	var _elm_lang$core$Process$sleep = _elm_lang$core$Native_Scheduler.sleep;
+	var _elm_lang$core$Process$spawn = _elm_lang$core$Native_Scheduler.spawn;
+
+	var _elm_lang$navigation$Navigation$replaceState = _elm_lang$navigation$Native_Navigation.replaceState;
+	var _elm_lang$navigation$Navigation$pushState = _elm_lang$navigation$Native_Navigation.pushState;
+	var _elm_lang$navigation$Navigation$go = _elm_lang$navigation$Native_Navigation.go;
+	var _elm_lang$navigation$Navigation$reloadPage = _elm_lang$navigation$Native_Navigation.reloadPage;
+	var _elm_lang$navigation$Navigation$setLocation = _elm_lang$navigation$Native_Navigation.setLocation;
+	var _elm_lang$navigation$Navigation_ops = _elm_lang$navigation$Navigation_ops || {};
+	_elm_lang$navigation$Navigation_ops['&>'] = F2(function (task1, task2) {
+		return A2(_elm_lang$core$Task$andThen, function (_p0) {
+			return task2;
+		}, task1);
+	});
+	var _elm_lang$navigation$Navigation$notify = F3(function (router, subs, location) {
+		var send = function send(_p1) {
+			var _p2 = _p1;
+			return A2(_elm_lang$core$Platform$sendToApp, router, _p2._0(location));
+		};
+		return A2(_elm_lang$navigation$Navigation_ops['&>'], _elm_lang$core$Task$sequence(A2(_elm_lang$core$List$map, send, subs)), _elm_lang$core$Task$succeed({ ctor: '_Tuple0' }));
+	});
+	var _elm_lang$navigation$Navigation$cmdHelp = F3(function (router, subs, cmd) {
+		var _p3 = cmd;
+		switch (_p3.ctor) {
+			case 'Jump':
+				return _elm_lang$navigation$Navigation$go(_p3._0);
+			case 'New':
+				return A2(_elm_lang$core$Task$andThen, A2(_elm_lang$navigation$Navigation$notify, router, subs), _elm_lang$navigation$Navigation$pushState(_p3._0));
+			case 'Modify':
+				return A2(_elm_lang$core$Task$andThen, A2(_elm_lang$navigation$Navigation$notify, router, subs), _elm_lang$navigation$Navigation$replaceState(_p3._0));
+			case 'Visit':
+				return _elm_lang$navigation$Navigation$setLocation(_p3._0);
+			default:
+				return _elm_lang$navigation$Navigation$reloadPage(_p3._0);
+		}
+	});
+	var _elm_lang$navigation$Navigation$killPopWatcher = function _elm_lang$navigation$Navigation$killPopWatcher(popWatcher) {
+		var _p4 = popWatcher;
+		if (_p4.ctor === 'Normal') {
+			return _elm_lang$core$Process$kill(_p4._0);
+		} else {
+			return A2(_elm_lang$navigation$Navigation_ops['&>'], _elm_lang$core$Process$kill(_p4._0), _elm_lang$core$Process$kill(_p4._1));
+		}
+	};
+	var _elm_lang$navigation$Navigation$onSelfMsg = F3(function (router, location, state) {
+		return A2(_elm_lang$navigation$Navigation_ops['&>'], A3(_elm_lang$navigation$Navigation$notify, router, state.subs, location), _elm_lang$core$Task$succeed(state));
+	});
+	var _elm_lang$navigation$Navigation$subscription = _elm_lang$core$Native_Platform.leaf('Navigation');
+	var _elm_lang$navigation$Navigation$command = _elm_lang$core$Native_Platform.leaf('Navigation');
+	var _elm_lang$navigation$Navigation$Location = function _elm_lang$navigation$Navigation$Location(a) {
+		return function (b) {
+			return function (c) {
+				return function (d) {
+					return function (e) {
+						return function (f) {
+							return function (g) {
+								return function (h) {
+									return function (i) {
+										return function (j) {
+											return function (k) {
+												return { href: a, host: b, hostname: c, protocol: d, origin: e, port_: f, pathname: g, search: h, hash: i, username: j, password: k };
+											};
+										};
+									};
+								};
+							};
+						};
+					};
+				};
+			};
+		};
+	};
+	var _elm_lang$navigation$Navigation$State = F2(function (a, b) {
+		return { subs: a, popWatcher: b };
+	});
+	var _elm_lang$navigation$Navigation$init = _elm_lang$core$Task$succeed(A2(_elm_lang$navigation$Navigation$State, { ctor: '[]' }, _elm_lang$core$Maybe$Nothing));
+	var _elm_lang$navigation$Navigation$Reload = function _elm_lang$navigation$Navigation$Reload(a) {
+		return { ctor: 'Reload', _0: a };
+	};
+	var _elm_lang$navigation$Navigation$reload = _elm_lang$navigation$Navigation$command(_elm_lang$navigation$Navigation$Reload(false));
+	var _elm_lang$navigation$Navigation$reloadAndSkipCache = _elm_lang$navigation$Navigation$command(_elm_lang$navigation$Navigation$Reload(true));
+	var _elm_lang$navigation$Navigation$Visit = function _elm_lang$navigation$Navigation$Visit(a) {
+		return { ctor: 'Visit', _0: a };
+	};
+	var _elm_lang$navigation$Navigation$load = function _elm_lang$navigation$Navigation$load(url) {
+		return _elm_lang$navigation$Navigation$command(_elm_lang$navigation$Navigation$Visit(url));
+	};
+	var _elm_lang$navigation$Navigation$Modify = function _elm_lang$navigation$Navigation$Modify(a) {
+		return { ctor: 'Modify', _0: a };
+	};
+	var _elm_lang$navigation$Navigation$modifyUrl = function _elm_lang$navigation$Navigation$modifyUrl(url) {
+		return _elm_lang$navigation$Navigation$command(_elm_lang$navigation$Navigation$Modify(url));
+	};
+	var _elm_lang$navigation$Navigation$New = function _elm_lang$navigation$Navigation$New(a) {
+		return { ctor: 'New', _0: a };
+	};
+	var _elm_lang$navigation$Navigation$newUrl = function _elm_lang$navigation$Navigation$newUrl(url) {
+		return _elm_lang$navigation$Navigation$command(_elm_lang$navigation$Navigation$New(url));
+	};
+	var _elm_lang$navigation$Navigation$Jump = function _elm_lang$navigation$Navigation$Jump(a) {
+		return { ctor: 'Jump', _0: a };
+	};
+	var _elm_lang$navigation$Navigation$back = function _elm_lang$navigation$Navigation$back(n) {
+		return _elm_lang$navigation$Navigation$command(_elm_lang$navigation$Navigation$Jump(0 - n));
+	};
+	var _elm_lang$navigation$Navigation$forward = function _elm_lang$navigation$Navigation$forward(n) {
+		return _elm_lang$navigation$Navigation$command(_elm_lang$navigation$Navigation$Jump(n));
+	};
+	var _elm_lang$navigation$Navigation$cmdMap = F2(function (_p5, myCmd) {
+		var _p6 = myCmd;
+		switch (_p6.ctor) {
+			case 'Jump':
+				return _elm_lang$navigation$Navigation$Jump(_p6._0);
+			case 'New':
+				return _elm_lang$navigation$Navigation$New(_p6._0);
+			case 'Modify':
+				return _elm_lang$navigation$Navigation$Modify(_p6._0);
+			case 'Visit':
+				return _elm_lang$navigation$Navigation$Visit(_p6._0);
+			default:
+				return _elm_lang$navigation$Navigation$Reload(_p6._0);
+		}
+	});
+	var _elm_lang$navigation$Navigation$Monitor = function _elm_lang$navigation$Navigation$Monitor(a) {
+		return { ctor: 'Monitor', _0: a };
+	};
+	var _elm_lang$navigation$Navigation$program = F2(function (locationToMessage, stuff) {
+		var init = stuff.init(_elm_lang$navigation$Native_Navigation.getLocation({ ctor: '_Tuple0' }));
+		var subs = function subs(model) {
+			return _elm_lang$core$Platform_Sub$batch({
+				ctor: '::',
+				_0: _elm_lang$navigation$Navigation$subscription(_elm_lang$navigation$Navigation$Monitor(locationToMessage)),
+				_1: {
+					ctor: '::',
+					_0: stuff.subscriptions(model),
+					_1: { ctor: '[]' }
+				}
+			});
+		};
+		return _elm_lang$html$Html$program({ init: init, view: stuff.view, update: stuff.update, subscriptions: subs });
+	});
+	var _elm_lang$navigation$Navigation$programWithFlags = F2(function (locationToMessage, stuff) {
+		var init = function init(flags) {
+			return A2(stuff.init, flags, _elm_lang$navigation$Native_Navigation.getLocation({ ctor: '_Tuple0' }));
+		};
+		var subs = function subs(model) {
+			return _elm_lang$core$Platform_Sub$batch({
+				ctor: '::',
+				_0: _elm_lang$navigation$Navigation$subscription(_elm_lang$navigation$Navigation$Monitor(locationToMessage)),
+				_1: {
+					ctor: '::',
+					_0: stuff.subscriptions(model),
+					_1: { ctor: '[]' }
+				}
+			});
+		};
+		return _elm_lang$html$Html$programWithFlags({ init: init, view: stuff.view, update: stuff.update, subscriptions: subs });
+	});
+	var _elm_lang$navigation$Navigation$subMap = F2(function (func, _p7) {
+		var _p8 = _p7;
+		return _elm_lang$navigation$Navigation$Monitor(function (_p9) {
+			return func(_p8._0(_p9));
+		});
+	});
+	var _elm_lang$navigation$Navigation$InternetExplorer = F2(function (a, b) {
+		return { ctor: 'InternetExplorer', _0: a, _1: b };
+	});
+	var _elm_lang$navigation$Navigation$Normal = function _elm_lang$navigation$Navigation$Normal(a) {
+		return { ctor: 'Normal', _0: a };
+	};
+	var _elm_lang$navigation$Navigation$spawnPopWatcher = function _elm_lang$navigation$Navigation$spawnPopWatcher(router) {
+		var reportLocation = function reportLocation(_p10) {
+			return A2(_elm_lang$core$Platform$sendToSelf, router, _elm_lang$navigation$Native_Navigation.getLocation({ ctor: '_Tuple0' }));
+		};
+		return _elm_lang$navigation$Native_Navigation.isInternetExplorer11({ ctor: '_Tuple0' }) ? A3(_elm_lang$core$Task$map2, _elm_lang$navigation$Navigation$InternetExplorer, _elm_lang$core$Process$spawn(A3(_elm_lang$dom$Dom_LowLevel$onWindow, 'popstate', _elm_lang$core$Json_Decode$value, reportLocation)), _elm_lang$core$Process$spawn(A3(_elm_lang$dom$Dom_LowLevel$onWindow, 'hashchange', _elm_lang$core$Json_Decode$value, reportLocation))) : A2(_elm_lang$core$Task$map, _elm_lang$navigation$Navigation$Normal, _elm_lang$core$Process$spawn(A3(_elm_lang$dom$Dom_LowLevel$onWindow, 'popstate', _elm_lang$core$Json_Decode$value, reportLocation)));
+	};
+	var _elm_lang$navigation$Navigation$onEffects = F4(function (router, cmds, subs, _p11) {
+		var _p12 = _p11;
+		var _p15 = _p12.popWatcher;
+		var stepState = function () {
+			var _p13 = { ctor: '_Tuple2', _0: subs, _1: _p15 };
+			_v6_2: do {
+				if (_p13._0.ctor === '[]') {
+					if (_p13._1.ctor === 'Just') {
+						return A2(_elm_lang$navigation$Navigation_ops['&>'], _elm_lang$navigation$Navigation$killPopWatcher(_p13._1._0), _elm_lang$core$Task$succeed(A2(_elm_lang$navigation$Navigation$State, subs, _elm_lang$core$Maybe$Nothing)));
+					} else {
+						break _v6_2;
+					}
+				} else {
+					if (_p13._1.ctor === 'Nothing') {
+						return A2(_elm_lang$core$Task$map, function (_p14) {
+							return A2(_elm_lang$navigation$Navigation$State, subs, _elm_lang$core$Maybe$Just(_p14));
+						}, _elm_lang$navigation$Navigation$spawnPopWatcher(router));
+					} else {
+						break _v6_2;
+					}
+				}
+			} while (false);
+			return _elm_lang$core$Task$succeed(A2(_elm_lang$navigation$Navigation$State, subs, _p15));
+		}();
+		return A2(_elm_lang$navigation$Navigation_ops['&>'], _elm_lang$core$Task$sequence(A2(_elm_lang$core$List$map, A2(_elm_lang$navigation$Navigation$cmdHelp, router, subs), cmds)), stepState);
+	});
+	_elm_lang$core$Native_Platform.effectManagers['Navigation'] = { pkg: 'elm-lang/navigation', init: _elm_lang$navigation$Navigation$init, onEffects: _elm_lang$navigation$Navigation$onEffects, onSelfMsg: _elm_lang$navigation$Navigation$onSelfMsg, tag: 'fx', cmdMap: _elm_lang$navigation$Navigation$cmdMap, subMap: _elm_lang$navigation$Navigation$subMap };
+
+	var _krisajenkins$remotedata$RemoteData$isNotAsked = function _krisajenkins$remotedata$RemoteData$isNotAsked(data) {
+		var _p0 = data;
+		if (_p0.ctor === 'NotAsked') {
+			return true;
+		} else {
+			return false;
+		}
+	};
+	var _krisajenkins$remotedata$RemoteData$isLoading = function _krisajenkins$remotedata$RemoteData$isLoading(data) {
+		var _p1 = data;
+		if (_p1.ctor === 'Loading') {
+			return true;
+		} else {
+			return false;
+		}
+	};
+	var _krisajenkins$remotedata$RemoteData$isFailure = function _krisajenkins$remotedata$RemoteData$isFailure(data) {
+		var _p2 = data;
+		if (_p2.ctor === 'Failure') {
+			return true;
+		} else {
+			return false;
+		}
+	};
+	var _krisajenkins$remotedata$RemoteData$isSuccess = function _krisajenkins$remotedata$RemoteData$isSuccess(data) {
+		var _p3 = data;
+		if (_p3.ctor === 'Success') {
+			return true;
+		} else {
+			return false;
+		}
+	};
+	var _krisajenkins$remotedata$RemoteData$withDefault = F2(function ($default, data) {
+		var _p4 = data;
+		if (_p4.ctor === 'Success') {
+			return _p4._0;
+		} else {
+			return $default;
+		}
+	});
+	var _krisajenkins$remotedata$RemoteData$Success = function _krisajenkins$remotedata$RemoteData$Success(a) {
+		return { ctor: 'Success', _0: a };
+	};
+	var _krisajenkins$remotedata$RemoteData$succeed = _krisajenkins$remotedata$RemoteData$Success;
+	var _krisajenkins$remotedata$RemoteData$prism = {
+		reverseGet: _krisajenkins$remotedata$RemoteData$Success,
+		getOption: function getOption(data) {
+			var _p5 = data;
+			if (_p5.ctor === 'Success') {
+				return _elm_lang$core$Maybe$Just(_p5._0);
+			} else {
+				return _elm_lang$core$Maybe$Nothing;
+			}
+		}
+	};
+	var _krisajenkins$remotedata$RemoteData$Failure = function _krisajenkins$remotedata$RemoteData$Failure(a) {
+		return { ctor: 'Failure', _0: a };
+	};
+	var _krisajenkins$remotedata$RemoteData$fromResult = function _krisajenkins$remotedata$RemoteData$fromResult(result) {
+		var _p6 = result;
+		if (_p6.ctor === 'Err') {
+			return _krisajenkins$remotedata$RemoteData$Failure(_p6._0);
+		} else {
+			return _krisajenkins$remotedata$RemoteData$Success(_p6._0);
+		}
+	};
+	var _krisajenkins$remotedata$RemoteData$asCmd = _elm_lang$core$Task$attempt(_krisajenkins$remotedata$RemoteData$fromResult);
+	var _krisajenkins$remotedata$RemoteData$sendRequest = _elm_lang$http$Http$send(_krisajenkins$remotedata$RemoteData$fromResult);
+	var _krisajenkins$remotedata$RemoteData$fromTask = function _krisajenkins$remotedata$RemoteData$fromTask(_p7) {
+		return A2(_elm_lang$core$Task$onError, function (_p8) {
+			return _elm_lang$core$Task$succeed(_krisajenkins$remotedata$RemoteData$Failure(_p8));
+		}, A2(_elm_lang$core$Task$map, _krisajenkins$remotedata$RemoteData$Success, _p7));
+	};
+	var _krisajenkins$remotedata$RemoteData$Loading = { ctor: 'Loading' };
+	var _krisajenkins$remotedata$RemoteData$NotAsked = { ctor: 'NotAsked' };
+	var _krisajenkins$remotedata$RemoteData$map = F2(function (f, data) {
+		var _p9 = data;
+		switch (_p9.ctor) {
+			case 'Success':
+				return _krisajenkins$remotedata$RemoteData$Success(f(_p9._0));
+			case 'Loading':
+				return _krisajenkins$remotedata$RemoteData$Loading;
+			case 'NotAsked':
+				return _krisajenkins$remotedata$RemoteData$NotAsked;
+			default:
+				return _krisajenkins$remotedata$RemoteData$Failure(_p9._0);
+		}
+	});
+	var _krisajenkins$remotedata$RemoteData$toMaybe = function _krisajenkins$remotedata$RemoteData$toMaybe(_p10) {
+		return A2(_krisajenkins$remotedata$RemoteData$withDefault, _elm_lang$core$Maybe$Nothing, A2(_krisajenkins$remotedata$RemoteData$map, _elm_lang$core$Maybe$Just, _p10));
+	};
+	var _krisajenkins$remotedata$RemoteData$mapError = F2(function (f, data) {
+		var _p11 = data;
+		switch (_p11.ctor) {
+			case 'Success':
+				return _krisajenkins$remotedata$RemoteData$Success(_p11._0);
+			case 'Failure':
+				return _krisajenkins$remotedata$RemoteData$Failure(f(_p11._0));
+			case 'Loading':
+				return _krisajenkins$remotedata$RemoteData$Loading;
+			default:
+				return _krisajenkins$remotedata$RemoteData$NotAsked;
+		}
+	});
+	var _krisajenkins$remotedata$RemoteData$mapBoth = F2(function (successFn, errorFn) {
+		return function (_p12) {
+			return A2(_krisajenkins$remotedata$RemoteData$mapError, errorFn, A2(_krisajenkins$remotedata$RemoteData$map, successFn, _p12));
+		};
+	});
+	var _krisajenkins$remotedata$RemoteData$andThen = F2(function (f, data) {
+		var _p13 = data;
+		switch (_p13.ctor) {
+			case 'Success':
+				return f(_p13._0);
+			case 'Failure':
+				return _krisajenkins$remotedata$RemoteData$Failure(_p13._0);
+			case 'NotAsked':
+				return _krisajenkins$remotedata$RemoteData$NotAsked;
+			default:
+				return _krisajenkins$remotedata$RemoteData$Loading;
+		}
+	});
+	var _krisajenkins$remotedata$RemoteData$andMap = F2(function (wrappedValue, wrappedFunction) {
+		var _p14 = wrappedFunction;
+		switch (_p14.ctor) {
+			case 'Success':
+				return A2(_krisajenkins$remotedata$RemoteData$map, _p14._0, wrappedValue);
+			case 'Failure':
+				return _krisajenkins$remotedata$RemoteData$Failure(_p14._0);
+			case 'Loading':
+				return _krisajenkins$remotedata$RemoteData$Loading;
+			default:
+				return _krisajenkins$remotedata$RemoteData$NotAsked;
+		}
+	});
+	var _krisajenkins$remotedata$RemoteData$map2 = F3(function (f, a, b) {
+		return A2(_krisajenkins$remotedata$RemoteData$andMap, b, A2(_krisajenkins$remotedata$RemoteData$map, f, a));
+	});
+	var _krisajenkins$remotedata$RemoteData$map3 = F4(function (f, a, b, c) {
+		return A2(_krisajenkins$remotedata$RemoteData$andMap, c, A2(_krisajenkins$remotedata$RemoteData$andMap, b, A2(_krisajenkins$remotedata$RemoteData$map, f, a)));
+	});
+	var _krisajenkins$remotedata$RemoteData$append = F2(function (a, b) {
+		return A2(_krisajenkins$remotedata$RemoteData$andMap, b, A2(_krisajenkins$remotedata$RemoteData$map, F2(function (v0, v1) {
+			return { ctor: '_Tuple2', _0: v0, _1: v1 };
+		}), a));
+	});
+	var _krisajenkins$remotedata$RemoteData$update = F2(function (f, remoteData) {
+		var _p15 = remoteData;
+		switch (_p15.ctor) {
+			case 'Success':
+				var _p16 = f(_p15._0);
+				var first = _p16._0;
+				var second = _p16._1;
+				return {
+					ctor: '_Tuple2',
+					_0: _krisajenkins$remotedata$RemoteData$Success(first),
+					_1: second
+				};
+			case 'NotAsked':
+				return { ctor: '_Tuple2', _0: _krisajenkins$remotedata$RemoteData$NotAsked, _1: _elm_lang$core$Platform_Cmd$none };
+			case 'Loading':
+				return { ctor: '_Tuple2', _0: _krisajenkins$remotedata$RemoteData$Loading, _1: _elm_lang$core$Platform_Cmd$none };
+			default:
+				return {
+					ctor: '_Tuple2',
+					_0: _krisajenkins$remotedata$RemoteData$Failure(_p15._0),
+					_1: _elm_lang$core$Platform_Cmd$none
+				};
+		}
+	});
+
+	var _agaviria$tuxedo$Msgs$SignupSubmit = { ctor: 'SignupSubmit' };
+	var _agaviria$tuxedo$Msgs$Logout = { ctor: 'Logout' };
+	var _agaviria$tuxedo$Msgs$OnFetchSession = function _agaviria$tuxedo$Msgs$OnFetchSession(a) {
+		return { ctor: 'OnFetchSession', _0: a };
+	};
+	var _agaviria$tuxedo$Msgs$OnLocationChange = function _agaviria$tuxedo$Msgs$OnLocationChange(a) {
+		return { ctor: 'OnLocationChange', _0: a };
+	};
+
+	var _agaviria$tuxedo$Commands$encodeUser = function _agaviria$tuxedo$Commands$encodeUser(record) {
+		return _elm_lang$core$Json_Encode$object({
+			ctor: '::',
+			_0: {
+				ctor: '_Tuple2',
+				_0: 'name',
+				_1: _elm_lang$core$Json_Encode$string(record.username)
+			},
+			_1: {
+				ctor: '::',
+				_0: {
+					ctor: '_Tuple2',
+					_0: 'email',
+					_1: _elm_lang$core$Json_Encode$string(record.email)
+				},
+				_1: {
+					ctor: '::',
+					_0: {
+						ctor: '_Tuple2',
+						_0: 'password',
+						_1: _elm_lang$core$Json_Encode$string(record.pass)
+					},
+					_1: { ctor: '[]' }
+				}
+			}
+		});
+	};
+	var _agaviria$tuxedo$Commands$encodeSession = function _agaviria$tuxedo$Commands$encodeSession(formFields) {
+		return _elm_lang$core$Json_Encode$object({
+			ctor: '::',
+			_0: {
+				ctor: '_Tuple2',
+				_0: 'user',
+				_1: _agaviria$tuxedo$Commands$encodeUser(formFields)
+			},
+			_1: { ctor: '[]' }
+		});
+	};
+	var _agaviria$tuxedo$Commands$decodeUser = A4(_elm_lang$core$Json_Decode$map3, _agaviria$tuxedo$Models$User, A2(_elm_lang$core$Json_Decode$field, 'id', _elm_lang$core$Json_Decode$int), A2(_elm_lang$core$Json_Decode$field, 'name', _elm_lang$core$Json_Decode$string), A2(_elm_lang$core$Json_Decode$field, 'email', _elm_lang$core$Json_Decode$string));
+	var _agaviria$tuxedo$Commands$decodeSession = A3(_elm_lang$core$Json_Decode$map2, _agaviria$tuxedo$Models$Session, A2(_elm_lang$core$Json_Decode$field, 'user', _agaviria$tuxedo$Commands$decodeUser), A2(_elm_lang$core$Json_Decode$field, 'jwt', _elm_lang$core$Json_Decode$string));
+	var _agaviria$tuxedo$Commands$signupUrl = 'http://localhost:4000/api/v1/register';
+	var _agaviria$tuxedo$Commands$signupRequest = function _agaviria$tuxedo$Commands$signupRequest(formFields) {
+		return _elm_lang$http$Http$request({
+			body: _elm_lang$http$Http$jsonBody(_agaviria$tuxedo$Commands$encodeSession(formFields)),
+			expect: _elm_lang$http$Http$expectJson(_agaviria$tuxedo$Commands$decodeSession),
+			headers: { ctor: '[]' },
+			method: 'POST',
+			timeout: _elm_lang$core$Maybe$Nothing,
+			url: _agaviria$tuxedo$Commands$signupUrl,
+			withCredentials: false
+		});
+	};
+	var _agaviria$tuxedo$Commands$signupUser = function _agaviria$tuxedo$Commands$signupUser(formFields) {
+		return A2(_elm_lang$core$Platform_Cmd$map, _agaviria$tuxedo$Msgs$OnFetchSession, _krisajenkins$remotedata$RemoteData$sendRequest(_agaviria$tuxedo$Commands$signupRequest(formFields)));
+	};
+
+	var _evancz$url_parser$UrlParser$toKeyValuePair = function _evancz$url_parser$UrlParser$toKeyValuePair(segment) {
+		var _p0 = A2(_elm_lang$core$String$split, '=', segment);
+		if (_p0.ctor === '::' && _p0._1.ctor === '::' && _p0._1._1.ctor === '[]') {
+			return A3(_elm_lang$core$Maybe$map2, F2(function (v0, v1) {
+				return { ctor: '_Tuple2', _0: v0, _1: v1 };
+			}), _elm_lang$http$Http$decodeUri(_p0._0), _elm_lang$http$Http$decodeUri(_p0._1._0));
+		} else {
+			return _elm_lang$core$Maybe$Nothing;
+		}
+	};
+	var _evancz$url_parser$UrlParser$parseParams = function _evancz$url_parser$UrlParser$parseParams(queryString) {
+		return _elm_lang$core$Dict$fromList(A2(_elm_lang$core$List$filterMap, _evancz$url_parser$UrlParser$toKeyValuePair, A2(_elm_lang$core$String$split, '&', A2(_elm_lang$core$String$dropLeft, 1, queryString))));
+	};
+	var _evancz$url_parser$UrlParser$splitUrl = function _evancz$url_parser$UrlParser$splitUrl(url) {
+		var _p1 = A2(_elm_lang$core$String$split, '/', url);
+		if (_p1.ctor === '::' && _p1._0 === '') {
+			return _p1._1;
+		} else {
+			return _p1;
+		}
+	};
+	var _evancz$url_parser$UrlParser$parseHelp = function _evancz$url_parser$UrlParser$parseHelp(states) {
+		parseHelp: while (true) {
+			var _p2 = states;
+			if (_p2.ctor === '[]') {
+				return _elm_lang$core$Maybe$Nothing;
+			} else {
+				var _p4 = _p2._0;
+				var _p3 = _p4.unvisited;
+				if (_p3.ctor === '[]') {
+					return _elm_lang$core$Maybe$Just(_p4.value);
+				} else {
+					if (_p3._0 === '' && _p3._1.ctor === '[]') {
+						return _elm_lang$core$Maybe$Just(_p4.value);
+					} else {
+						var _v4 = _p2._1;
+						states = _v4;
+						continue parseHelp;
+					}
+				}
+			}
+		}
+	};
+	var _evancz$url_parser$UrlParser$parse = F3(function (_p5, url, params) {
+		var _p6 = _p5;
+		return _evancz$url_parser$UrlParser$parseHelp(_p6._0({
+			visited: { ctor: '[]' },
+			unvisited: _evancz$url_parser$UrlParser$splitUrl(url),
+			params: params,
+			value: _elm_lang$core$Basics$identity
+		}));
+	});
+	var _evancz$url_parser$UrlParser$parseHash = F2(function (parser, location) {
+		return A3(_evancz$url_parser$UrlParser$parse, parser, A2(_elm_lang$core$String$dropLeft, 1, location.hash), _evancz$url_parser$UrlParser$parseParams(location.search));
+	});
+	var _evancz$url_parser$UrlParser$parsePath = F2(function (parser, location) {
+		return A3(_evancz$url_parser$UrlParser$parse, parser, location.pathname, _evancz$url_parser$UrlParser$parseParams(location.search));
+	});
+	var _evancz$url_parser$UrlParser$intParamHelp = function _evancz$url_parser$UrlParser$intParamHelp(maybeValue) {
+		var _p7 = maybeValue;
+		if (_p7.ctor === 'Nothing') {
+			return _elm_lang$core$Maybe$Nothing;
+		} else {
+			return _elm_lang$core$Result$toMaybe(_elm_lang$core$String$toInt(_p7._0));
+		}
+	};
+	var _evancz$url_parser$UrlParser$mapHelp = F2(function (func, _p8) {
+		var _p9 = _p8;
+		return {
+			visited: _p9.visited,
+			unvisited: _p9.unvisited,
+			params: _p9.params,
+			value: func(_p9.value)
+		};
+	});
+	var _evancz$url_parser$UrlParser$State = F4(function (a, b, c, d) {
+		return { visited: a, unvisited: b, params: c, value: d };
+	});
+	var _evancz$url_parser$UrlParser$Parser = function _evancz$url_parser$UrlParser$Parser(a) {
+		return { ctor: 'Parser', _0: a };
+	};
+	var _evancz$url_parser$UrlParser$s = function _evancz$url_parser$UrlParser$s(str) {
+		return _evancz$url_parser$UrlParser$Parser(function (_p10) {
+			var _p11 = _p10;
+			var _p12 = _p11.unvisited;
+			if (_p12.ctor === '[]') {
+				return { ctor: '[]' };
+			} else {
+				var _p13 = _p12._0;
+				return _elm_lang$core$Native_Utils.eq(_p13, str) ? {
+					ctor: '::',
+					_0: A4(_evancz$url_parser$UrlParser$State, { ctor: '::', _0: _p13, _1: _p11.visited }, _p12._1, _p11.params, _p11.value),
+					_1: { ctor: '[]' }
+				} : { ctor: '[]' };
+			}
+		});
+	};
+	var _evancz$url_parser$UrlParser$custom = F2(function (tipe, stringToSomething) {
+		return _evancz$url_parser$UrlParser$Parser(function (_p14) {
+			var _p15 = _p14;
+			var _p16 = _p15.unvisited;
+			if (_p16.ctor === '[]') {
+				return { ctor: '[]' };
+			} else {
+				var _p18 = _p16._0;
+				var _p17 = stringToSomething(_p18);
+				if (_p17.ctor === 'Ok') {
+					return {
+						ctor: '::',
+						_0: A4(_evancz$url_parser$UrlParser$State, { ctor: '::', _0: _p18, _1: _p15.visited }, _p16._1, _p15.params, _p15.value(_p17._0)),
+						_1: { ctor: '[]' }
+					};
+				} else {
+					return { ctor: '[]' };
+				}
+			}
+		});
+	});
+	var _evancz$url_parser$UrlParser$string = A2(_evancz$url_parser$UrlParser$custom, 'STRING', _elm_lang$core$Result$Ok);
+	var _evancz$url_parser$UrlParser$int = A2(_evancz$url_parser$UrlParser$custom, 'NUMBER', _elm_lang$core$String$toInt);
+	var _evancz$url_parser$UrlParser_ops = _evancz$url_parser$UrlParser_ops || {};
+	_evancz$url_parser$UrlParser_ops['</>'] = F2(function (_p20, _p19) {
+		var _p21 = _p20;
+		var _p22 = _p19;
+		return _evancz$url_parser$UrlParser$Parser(function (state) {
+			return A2(_elm_lang$core$List$concatMap, _p22._0, _p21._0(state));
+		});
+	});
+	var _evancz$url_parser$UrlParser$map = F2(function (subValue, _p23) {
+		var _p24 = _p23;
+		return _evancz$url_parser$UrlParser$Parser(function (_p25) {
+			var _p26 = _p25;
+			return A2(_elm_lang$core$List$map, _evancz$url_parser$UrlParser$mapHelp(_p26.value), _p24._0({ visited: _p26.visited, unvisited: _p26.unvisited, params: _p26.params, value: subValue }));
+		});
+	});
+	var _evancz$url_parser$UrlParser$oneOf = function _evancz$url_parser$UrlParser$oneOf(parsers) {
+		return _evancz$url_parser$UrlParser$Parser(function (state) {
+			return A2(_elm_lang$core$List$concatMap, function (_p27) {
+				var _p28 = _p27;
+				return _p28._0(state);
+			}, parsers);
+		});
+	};
+	var _evancz$url_parser$UrlParser$top = _evancz$url_parser$UrlParser$Parser(function (state) {
+		return {
+			ctor: '::',
+			_0: state,
+			_1: { ctor: '[]' }
+		};
+	});
+	var _evancz$url_parser$UrlParser_ops = _evancz$url_parser$UrlParser_ops || {};
+	_evancz$url_parser$UrlParser_ops['<?>'] = F2(function (_p30, _p29) {
+		var _p31 = _p30;
+		var _p32 = _p29;
+		return _evancz$url_parser$UrlParser$Parser(function (state) {
+			return A2(_elm_lang$core$List$concatMap, _p32._0, _p31._0(state));
+		});
+	});
+	var _evancz$url_parser$UrlParser$QueryParser = function _evancz$url_parser$UrlParser$QueryParser(a) {
+		return { ctor: 'QueryParser', _0: a };
+	};
+	var _evancz$url_parser$UrlParser$customParam = F2(function (key, func) {
+		return _evancz$url_parser$UrlParser$QueryParser(function (_p33) {
+			var _p34 = _p33;
+			var _p35 = _p34.params;
+			return {
+				ctor: '::',
+				_0: A4(_evancz$url_parser$UrlParser$State, _p34.visited, _p34.unvisited, _p35, _p34.value(func(A2(_elm_lang$core$Dict$get, key, _p35)))),
+				_1: { ctor: '[]' }
+			};
+		});
+	});
+	var _evancz$url_parser$UrlParser$stringParam = function _evancz$url_parser$UrlParser$stringParam(name) {
+		return A2(_evancz$url_parser$UrlParser$customParam, name, _elm_lang$core$Basics$identity);
+	};
+	var _evancz$url_parser$UrlParser$intParam = function _evancz$url_parser$UrlParser$intParam(name) {
+		return A2(_evancz$url_parser$UrlParser$customParam, name, _evancz$url_parser$UrlParser$intParamHelp);
+	};
+
+	var _agaviria$tuxedo$Routing$matchers = _evancz$url_parser$UrlParser$oneOf({
+		ctor: '::',
+		_0: A2(_evancz$url_parser$UrlParser$map, _agaviria$tuxedo$Models$IndexPage, _evancz$url_parser$UrlParser$top),
+		_1: {
+			ctor: '::',
+			_0: A2(_evancz$url_parser$UrlParser$map, _agaviria$tuxedo$Models$SignupPage, _evancz$url_parser$UrlParser$s('signup')),
+			_1: { ctor: '[]' }
+		}
+	});
+	var _agaviria$tuxedo$Routing$parseLocation = function _agaviria$tuxedo$Routing$parseLocation(location) {
+		var _p0 = A2(_evancz$url_parser$UrlParser$parseHash, _agaviria$tuxedo$Routing$matchers, location);
+		if (_p0.ctor === 'Just') {
+			return _p0._0;
+		} else {
+			return _agaviria$tuxedo$Models$NotFoundPage;
+		}
+	};
+
+	var _agaviria$tuxedo$Update$clearFields = function _agaviria$tuxedo$Update$clearFields(model) {
+		return _elm_lang$core$Native_Utils.update(model, { formFields: _agaviria$tuxedo$Models$initFormFields });
+	};
+	var _agaviria$tuxedo$Update$addFlashError = F2(function (message, model) {
+		var newFlash = { message: message, flash_type: 'error' };
+		return _elm_lang$core$Native_Utils.update(model, {
+			flash: _elm_lang$core$Maybe$Just(newFlash)
+		});
+	});
+	var _agaviria$tuxedo$Update$addSession = F2(function (sessionData, model) {
+		var _p0 = sessionData;
+		switch (_p0.ctor) {
+			case 'Success':
+				var _p1 = _p0._0;
+				return _elm_lang$core$Native_Utils.update(model, {
+					currentUser: _elm_lang$core$Maybe$Just(_p1.user),
+					jwt: _elm_lang$core$Maybe$Just(_p1.jwt)
+				});
+			case 'Failure':
+				return A2(_agaviria$tuxedo$Update$addFlashError, _elm_lang$core$Basics$toString(_p0._0), model);
+			default:
+				return model;
+		}
+	});
+	var _agaviria$tuxedo$Update$logout = function _agaviria$tuxedo$Update$logout(model) {
+		return _elm_lang$core$Native_Utils.update(model, { currentUser: _elm_lang$core$Maybe$Nothing, jwt: _elm_lang$core$Maybe$Nothing });
+	};
+	var _agaviria$tuxedo$Update$update = F2(function (msg, model) {
+		var _p2 = msg;
+		switch (_p2.ctor) {
+			case 'OnLocationChange':
+				var clearedModel = _agaviria$tuxedo$Update$clearFields(model);
+				var newRoute = _agaviria$tuxedo$Routing$parseLocation(_p2._0);
+				return {
+					ctor: '_Tuple2',
+					_0: _elm_lang$core$Native_Utils.update(clearedModel, { route: newRoute }),
+					_1: _elm_lang$core$Platform_Cmd$none
+				};
+			case 'Logout':
+				return {
+					ctor: '_Tuple2',
+					_0: _agaviria$tuxedo$Update$logout(model),
+					_1: _elm_lang$core$Platform_Cmd$none
+				};
+			case 'SignupSubmit':
+				return {
+					ctor: '_Tuple2',
+					_0: _agaviria$tuxedo$Update$clearFields(model),
+					_1: _agaviria$tuxedo$Commands$signupUser(model.formFields)
+				};
+			default:
+				return {
+					ctor: '_Tuple2',
+					_0: A2(_agaviria$tuxedo$Update$addSession, _p2._0, model),
+					_1: _elm_lang$core$Platform_Cmd$none
+				};
+		}
+	});
+
+	var _elm_lang$html$Html_Events$keyCode = A2(_elm_lang$core$Json_Decode$field, 'keyCode', _elm_lang$core$Json_Decode$int);
+	var _elm_lang$html$Html_Events$targetChecked = A2(_elm_lang$core$Json_Decode$at, {
+		ctor: '::',
+		_0: 'target',
+		_1: {
+			ctor: '::',
+			_0: 'checked',
+			_1: { ctor: '[]' }
+		}
+	}, _elm_lang$core$Json_Decode$bool);
+	var _elm_lang$html$Html_Events$targetValue = A2(_elm_lang$core$Json_Decode$at, {
+		ctor: '::',
+		_0: 'target',
+		_1: {
+			ctor: '::',
+			_0: 'value',
+			_1: { ctor: '[]' }
+		}
+	}, _elm_lang$core$Json_Decode$string);
+	var _elm_lang$html$Html_Events$defaultOptions = _elm_lang$virtual_dom$VirtualDom$defaultOptions;
+	var _elm_lang$html$Html_Events$onWithOptions = _elm_lang$virtual_dom$VirtualDom$onWithOptions;
+	var _elm_lang$html$Html_Events$on = _elm_lang$virtual_dom$VirtualDom$on;
+	var _elm_lang$html$Html_Events$onFocus = function _elm_lang$html$Html_Events$onFocus(msg) {
+		return A2(_elm_lang$html$Html_Events$on, 'focus', _elm_lang$core$Json_Decode$succeed(msg));
+	};
+	var _elm_lang$html$Html_Events$onBlur = function _elm_lang$html$Html_Events$onBlur(msg) {
+		return A2(_elm_lang$html$Html_Events$on, 'blur', _elm_lang$core$Json_Decode$succeed(msg));
+	};
+	var _elm_lang$html$Html_Events$onSubmitOptions = _elm_lang$core$Native_Utils.update(_elm_lang$html$Html_Events$defaultOptions, { preventDefault: true });
+	var _elm_lang$html$Html_Events$onSubmit = function _elm_lang$html$Html_Events$onSubmit(msg) {
+		return A3(_elm_lang$html$Html_Events$onWithOptions, 'submit', _elm_lang$html$Html_Events$onSubmitOptions, _elm_lang$core$Json_Decode$succeed(msg));
+	};
+	var _elm_lang$html$Html_Events$onCheck = function _elm_lang$html$Html_Events$onCheck(tagger) {
+		return A2(_elm_lang$html$Html_Events$on, 'change', A2(_elm_lang$core$Json_Decode$map, tagger, _elm_lang$html$Html_Events$targetChecked));
+	};
+	var _elm_lang$html$Html_Events$onInput = function _elm_lang$html$Html_Events$onInput(tagger) {
+		return A2(_elm_lang$html$Html_Events$on, 'input', A2(_elm_lang$core$Json_Decode$map, tagger, _elm_lang$html$Html_Events$targetValue));
+	};
+	var _elm_lang$html$Html_Events$onMouseOut = function _elm_lang$html$Html_Events$onMouseOut(msg) {
+		return A2(_elm_lang$html$Html_Events$on, 'mouseout', _elm_lang$core$Json_Decode$succeed(msg));
+	};
+	var _elm_lang$html$Html_Events$onMouseOver = function _elm_lang$html$Html_Events$onMouseOver(msg) {
+		return A2(_elm_lang$html$Html_Events$on, 'mouseover', _elm_lang$core$Json_Decode$succeed(msg));
+	};
+	var _elm_lang$html$Html_Events$onMouseLeave = function _elm_lang$html$Html_Events$onMouseLeave(msg) {
+		return A2(_elm_lang$html$Html_Events$on, 'mouseleave', _elm_lang$core$Json_Decode$succeed(msg));
+	};
+	var _elm_lang$html$Html_Events$onMouseEnter = function _elm_lang$html$Html_Events$onMouseEnter(msg) {
+		return A2(_elm_lang$html$Html_Events$on, 'mouseenter', _elm_lang$core$Json_Decode$succeed(msg));
+	};
+	var _elm_lang$html$Html_Events$onMouseUp = function _elm_lang$html$Html_Events$onMouseUp(msg) {
+		return A2(_elm_lang$html$Html_Events$on, 'mouseup', _elm_lang$core$Json_Decode$succeed(msg));
+	};
+	var _elm_lang$html$Html_Events$onMouseDown = function _elm_lang$html$Html_Events$onMouseDown(msg) {
+		return A2(_elm_lang$html$Html_Events$on, 'mousedown', _elm_lang$core$Json_Decode$succeed(msg));
+	};
+	var _elm_lang$html$Html_Events$onDoubleClick = function _elm_lang$html$Html_Events$onDoubleClick(msg) {
+		return A2(_elm_lang$html$Html_Events$on, 'dblclick', _elm_lang$core$Json_Decode$succeed(msg));
+	};
+	var _elm_lang$html$Html_Events$onClick = function _elm_lang$html$Html_Events$onClick(msg) {
+		return A2(_elm_lang$html$Html_Events$on, 'click', _elm_lang$core$Json_Decode$succeed(msg));
+	};
+	var _elm_lang$html$Html_Events$Options = F2(function (a, b) {
+		return { stopPropagation: a, preventDefault: b };
+	});
+
 	var _elm_lang$html$Html_Attributes$map = _elm_lang$virtual_dom$VirtualDom$mapProperty;
 	var _elm_lang$html$Html_Attributes$attribute = _elm_lang$virtual_dom$VirtualDom$attribute;
 	var _elm_lang$html$Html_Attributes$contextmenu = function _elm_lang$html$Html_Attributes$contextmenu(value) {
@@ -10150,70 +11664,213 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 	var _elm_lang$html$Html_Attributes$style = _elm_lang$virtual_dom$VirtualDom$style;
 
-	var _agaviria$tuxedo$Main$main = _elm_lang$virtual_dom$Native_VirtualDom.staticProgram(A2(_elm_lang$html$Html$div, {
+	var _agaviria$tuxedo$Views_HeaderView$flashAlert = function _agaviria$tuxedo$Views_HeaderView$flashAlert(flash) {
+		var _p0 = flash.flash_type;
+		if (_p0 === 'error') {
+			return A2(_elm_lang$html$Html$div, {
+				ctor: '::',
+				_0: _elm_lang$html$Html_Attributes$class('alert alert-danger'),
+				_1: { ctor: '[]' }
+			}, {
+				ctor: '::',
+				_0: _elm_lang$html$Html$text(flash.message),
+				_1: { ctor: '[]' }
+			});
+		} else {
+			return A2(_elm_lang$html$Html$div, {
+				ctor: '::',
+				_0: _elm_lang$html$Html_Attributes$class('alert alert-primary'),
+				_1: { ctor: '[]' }
+			}, {
+				ctor: '::',
+				_0: _elm_lang$html$Html$text(flash.message),
+				_1: { ctor: '[]' }
+			});
+		}
+	};
+	var _agaviria$tuxedo$Views_HeaderView$flashMessage = function _agaviria$tuxedo$Views_HeaderView$flashMessage(flash) {
+		var _p1 = flash;
+		if (_p1.ctor === 'Just') {
+			return _agaviria$tuxedo$Views_HeaderView$flashAlert(_p1._0);
+		} else {
+			return _elm_lang$html$Html$text('');
+		}
+	};
+	var _agaviria$tuxedo$Views_HeaderView$currentUserNav = function _agaviria$tuxedo$Views_HeaderView$currentUserNav(currentUser) {
+		var _p2 = currentUser;
+		if (_p2.ctor === 'Just') {
+			return A2(_elm_lang$html$Html$a, {
+				ctor: '::',
+				_0: _elm_lang$html$Html_Events$onClick(_agaviria$tuxedo$Msgs$Logout),
+				_1: {
+					ctor: '::',
+					_0: _elm_lang$html$Html_Attributes$class('nav-link'),
+					_1: {
+						ctor: '::',
+						_0: _elm_lang$html$Html_Attributes$href('#login'),
+						_1: { ctor: '[]' }
+					}
+				}
+			}, {
+				ctor: '::',
+				_0: _elm_lang$html$Html$text('Logout'),
+				_1: { ctor: '[]' }
+			});
+		} else {
+			return A2(_elm_lang$html$Html$a, {
+				ctor: '::',
+				_0: _elm_lang$html$Html_Attributes$href('#signup'),
+				_1: {
+					ctor: '::',
+					_0: _elm_lang$html$Html_Attributes$class('nav-link'),
+					_1: { ctor: '[]' }
+				}
+			}, {
+				ctor: '::',
+				_0: _elm_lang$html$Html$text('Sign up'),
+				_1: { ctor: '[]' }
+			});
+		}
+	};
+	var _agaviria$tuxedo$Views_HeaderView$navBarCollapseButton = A2(_elm_lang$html$Html$button, {
 		ctor: '::',
-		_0: _elm_lang$html$Html_Attributes$class('container'),
-		_1: { ctor: '[]' }
+		_0: _elm_lang$html$Html_Attributes$class('navbar-toggler navbar-toggler-right'),
+		_1: {
+			ctor: '::',
+			_0: A2(_elm_lang$html$Html_Attributes$attribute, 'type', 'button'),
+			_1: {
+				ctor: '::',
+				_0: A2(_elm_lang$html$Html_Attributes$attribute, 'data-toggle', 'collapse'),
+				_1: {
+					ctor: '::',
+					_0: A2(_elm_lang$html$Html_Attributes$attribute, 'data-target', '#navbarSupportedContent'),
+					_1: {
+						ctor: '::',
+						_0: A2(_elm_lang$html$Html_Attributes$attribute, 'aria-controls', 'navbarSupportedContent'),
+						_1: {
+							ctor: '::',
+							_0: A2(_elm_lang$html$Html_Attributes$attribute, 'aria-expanded', 'false'),
+							_1: {
+								ctor: '::',
+								_0: A2(_elm_lang$html$Html_Attributes$attribute, 'aria-label', 'Toggle navigation'),
+								_1: { ctor: '[]' }
+							}
+						}
+					}
+				}
+			}
+		}
 	}, {
 		ctor: '::',
-		_0: A2(_elm_lang$html$Html$div, {
+		_0: A2(_elm_lang$html$Html$span, {
 			ctor: '::',
-			_0: _elm_lang$html$Html_Attributes$class('row'),
+			_0: _elm_lang$html$Html_Attributes$class('navbar-toggler-icon'),
+			_1: { ctor: '[]' }
+		}, { ctor: '[]' }),
+		_1: { ctor: '[]' }
+	});
+	var _agaviria$tuxedo$Views_HeaderView$navBar = function _agaviria$tuxedo$Views_HeaderView$navBar(model) {
+		return A2(_elm_lang$html$Html$nav, {
+			ctor: '::',
+			_0: _elm_lang$html$Html_Attributes$class('navbar navbar-expand-md navbar-dark bg-dark'),
+			_1: { ctor: '[]' }
+		}, {
+			ctor: '::',
+			_0: A2(_elm_lang$html$Html$a, {
+				ctor: '::',
+				_0: _elm_lang$html$Html_Attributes$class('navbar-brand'),
+				_1: {
+					ctor: '::',
+					_0: _elm_lang$html$Html_Attributes$href('#'),
+					_1: { ctor: '[]' }
+				}
+			}, {
+				ctor: '::',
+				_0: _elm_lang$html$Html$text('HOME'),
+				_1: { ctor: '[]' }
+			}),
+			_1: {
+				ctor: '::',
+				_0: _agaviria$tuxedo$Views_HeaderView$navBarCollapseButton,
+				_1: {
+					ctor: '::',
+					_0: A2(_elm_lang$html$Html$div, {
+						ctor: '::',
+						_0: _elm_lang$html$Html_Attributes$class('collapse navbar-collapse'),
+						_1: {
+							ctor: '::',
+							_0: _elm_lang$html$Html_Attributes$id('navbarSupportedContent'),
+							_1: { ctor: '[]' }
+						}
+					}, {
+						ctor: '::',
+						_0: A2(_elm_lang$html$Html$ul, {
+							ctor: '::',
+							_0: _elm_lang$html$Html_Attributes$class('navbar-nav mr-auto'),
+							_1: { ctor: '[]' }
+						}, {
+							ctor: '::',
+							_0: A2(_elm_lang$html$Html$li, {
+								ctor: '::',
+								_0: _elm_lang$html$Html_Attributes$class('nav-item active'),
+								_1: { ctor: '[]' }
+							}, {
+								ctor: '::',
+								_0: _agaviria$tuxedo$Views_HeaderView$currentUserNav(model.currentUser),
+								_1: { ctor: '[]' }
+							}),
+							_1: { ctor: '[]' }
+						}),
+						_1: { ctor: '[]' }
+					}),
+					_1: { ctor: '[]' }
+				}
+			}
+		});
+	};
+
+	var _agaviria$tuxedo$View$for = function _agaviria$tuxedo$View$for(value) {
+		return A2(_elm_lang$html$Html_Attributes$attribute, 'for', value);
+	};
+	var _agaviria$tuxedo$View$notFoundView = A2(_elm_lang$html$Html$div, { ctor: '[]' }, {
+		ctor: '::',
+		_0: _elm_lang$html$Html$text('Not found'),
+		_1: { ctor: '[]' }
+	});
+	var _agaviria$tuxedo$View$signupView = function _agaviria$tuxedo$View$signupView(model) {
+		return A2(_elm_lang$html$Html$div, {
+			ctor: '::',
+			_0: _elm_lang$html$Html_Attributes$class('container'),
 			_1: { ctor: '[]' }
 		}, {
 			ctor: '::',
 			_0: A2(_elm_lang$html$Html$div, {
 				ctor: '::',
-				_0: _elm_lang$html$Html_Attributes$class('col-md-6 col-md-offset-3'),
+				_0: _elm_lang$html$Html_Attributes$class('row'),
 				_1: { ctor: '[]' }
 			}, {
 				ctor: '::',
 				_0: A2(_elm_lang$html$Html$div, {
 					ctor: '::',
-					_0: _elm_lang$html$Html_Attributes$id('msform'),
+					_0: _elm_lang$html$Html_Attributes$class('col-md-6 col-md-offset-3'),
 					_1: { ctor: '[]' }
 				}, {
 					ctor: '::',
-					_0: A2(_elm_lang$html$Html$ul, {
+					_0: A2(_elm_lang$html$Html$div, {
 						ctor: '::',
-						_0: _elm_lang$html$Html_Attributes$id('progressbar'),
+						_0: _elm_lang$html$Html_Attributes$id('msform'),
 						_1: { ctor: '[]' }
 					}, {
 						ctor: '::',
-						_0: A2(_elm_lang$html$Html$li, {
+						_0: A2(_elm_lang$html$Html$ul, {
 							ctor: '::',
-							_0: _elm_lang$html$Html_Attributes$class('active'),
+							_0: _elm_lang$html$Html_Attributes$id('progressbar'),
 							_1: { ctor: '[]' }
 						}, {
 							ctor: '::',
-							_0: _elm_lang$html$Html$text('Personal Details'),
-							_1: { ctor: '[]' }
-						}),
-						_1: {
-							ctor: '::',
-							_0: A2(_elm_lang$html$Html$li, { ctor: '[]' }, {
+							_0: A2(_elm_lang$html$Html$li, {
 								ctor: '::',
-								_0: _elm_lang$html$Html$text('Social Profile'),
-								_1: { ctor: '[]' }
-							}),
-							_1: {
-								ctor: '::',
-								_0: A2(_elm_lang$html$Html$li, { ctor: '[]' }, {
-									ctor: '::',
-									_0: _elm_lang$html$Html$text('Account Setup'),
-									_1: { ctor: '[]' }
-								}),
-								_1: { ctor: '[]' }
-							}
-						}
-					}),
-					_1: {
-						ctor: '::',
-						_0: A2(_elm_lang$html$Html$fieldset, { ctor: '[]' }, {
-							ctor: '::',
-							_0: A2(_elm_lang$html$Html$h2, {
-								ctor: '::',
-								_0: _elm_lang$html$Html_Attributes$class('fs-title'),
+								_0: _elm_lang$html$Html_Attributes$class('active'),
 								_1: { ctor: '[]' }
 							}, {
 								ctor: '::',
@@ -10222,83 +11879,19 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 							}),
 							_1: {
 								ctor: '::',
-								_0: A2(_elm_lang$html$Html$h3, {
+								_0: A2(_elm_lang$html$Html$li, { ctor: '[]' }, {
 									ctor: '::',
-									_0: _elm_lang$html$Html_Attributes$class('fs-subtitle'),
-									_1: { ctor: '[]' }
-								}, {
-									ctor: '::',
-									_0: _elm_lang$html$Html$text('Please provide info'),
+									_0: _elm_lang$html$Html$text('Social Profile'),
 									_1: { ctor: '[]' }
 								}),
 								_1: {
 									ctor: '::',
-									_0: A2(_elm_lang$html$Html$input, {
+									_0: A2(_elm_lang$html$Html$li, { ctor: '[]' }, {
 										ctor: '::',
-										_0: _elm_lang$html$Html_Attributes$type_('text'),
-										_1: {
-											ctor: '::',
-											_0: _elm_lang$html$Html_Attributes$name('fname'),
-											_1: {
-												ctor: '::',
-												_0: _elm_lang$html$Html_Attributes$placeholder('First Name'),
-												_1: { ctor: '[]' }
-											}
-										}
-									}, { ctor: '[]' }),
-									_1: {
-										ctor: '::',
-										_0: A2(_elm_lang$html$Html$input, {
-											ctor: '::',
-											_0: _elm_lang$html$Html_Attributes$type_('text'),
-											_1: {
-												ctor: '::',
-												_0: _elm_lang$html$Html_Attributes$name('lname'),
-												_1: {
-													ctor: '::',
-													_0: _elm_lang$html$Html_Attributes$placeholder('Last Name'),
-													_1: { ctor: '[]' }
-												}
-											}
-										}, { ctor: '[]' }),
-										_1: {
-											ctor: '::',
-											_0: A2(_elm_lang$html$Html$input, {
-												ctor: '::',
-												_0: _elm_lang$html$Html_Attributes$type_('text'),
-												_1: {
-													ctor: '::',
-													_0: _elm_lang$html$Html_Attributes$name('email'),
-													_1: {
-														ctor: '::',
-														_0: _elm_lang$html$Html_Attributes$placeholder('Email'),
-														_1: { ctor: '[]' }
-													}
-												}
-											}, { ctor: '[]' }),
-											_1: {
-												ctor: '::',
-												_0: A2(_elm_lang$html$Html$input, {
-													ctor: '::',
-													_0: _elm_lang$html$Html_Attributes$type_('button'),
-													_1: {
-														ctor: '::',
-														_0: _elm_lang$html$Html_Attributes$name('next'),
-														_1: {
-															ctor: '::',
-															_0: _elm_lang$html$Html_Attributes$class('next action-button'),
-															_1: {
-																ctor: '::',
-																_0: _elm_lang$html$Html_Attributes$value('next'),
-																_1: { ctor: '[]' }
-															}
-														}
-													}
-												}, { ctor: '[]' }),
-												_1: { ctor: '[]' }
-											}
-										}
-									}
+										_0: _elm_lang$html$Html$text('Account Setup'),
+										_1: { ctor: '[]' }
+									}),
+									_1: { ctor: '[]' }
 								}
 							}
 						}),
@@ -10312,7 +11905,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 									_1: { ctor: '[]' }
 								}, {
 									ctor: '::',
-									_0: _elm_lang$html$Html$text('Social Profile'),
+									_0: _elm_lang$html$Html$text('Personal Details'),
 									_1: { ctor: '[]' }
 								}),
 								_1: {
@@ -10323,7 +11916,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 										_1: { ctor: '[]' }
 									}, {
 										ctor: '::',
-										_0: _elm_lang$html$Html$text('Please provide a social network profile'),
+										_0: _elm_lang$html$Html$text('Please provide info'),
 										_1: { ctor: '[]' }
 									}),
 									_1: {
@@ -10333,10 +11926,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 											_0: _elm_lang$html$Html_Attributes$type_('text'),
 											_1: {
 												ctor: '::',
-												_0: _elm_lang$html$Html_Attributes$name('twitter'),
+												_0: _elm_lang$html$Html_Attributes$name('fname'),
 												_1: {
 													ctor: '::',
-													_0: _elm_lang$html$Html_Attributes$placeholder('Twitter'),
+													_0: _elm_lang$html$Html_Attributes$placeholder('First Name'),
 													_1: { ctor: '[]' }
 												}
 											}
@@ -10348,10 +11941,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 												_0: _elm_lang$html$Html_Attributes$type_('text'),
 												_1: {
 													ctor: '::',
-													_0: _elm_lang$html$Html_Attributes$name('facebook'),
+													_0: _elm_lang$html$Html_Attributes$name('lname'),
 													_1: {
 														ctor: '::',
-														_0: _elm_lang$html$Html_Attributes$placeholder('Facebook'),
+														_0: _elm_lang$html$Html_Attributes$placeholder('Last Name'),
 														_1: { ctor: '[]' }
 													}
 												}
@@ -10363,10 +11956,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 													_0: _elm_lang$html$Html_Attributes$type_('text'),
 													_1: {
 														ctor: '::',
-														_0: _elm_lang$html$Html_Attributes$name('instagram'),
+														_0: _elm_lang$html$Html_Attributes$name('email'),
 														_1: {
 															ctor: '::',
-															_0: _elm_lang$html$Html_Attributes$placeholder('Instagram'),
+															_0: _elm_lang$html$Html_Attributes$placeholder('Email'),
 															_1: { ctor: '[]' }
 														}
 													}
@@ -10378,39 +11971,19 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 														_0: _elm_lang$html$Html_Attributes$type_('button'),
 														_1: {
 															ctor: '::',
-															_0: _elm_lang$html$Html_Attributes$name('previous'),
+															_0: _elm_lang$html$Html_Attributes$name('next'),
 															_1: {
 																ctor: '::',
-																_0: _elm_lang$html$Html_Attributes$class('previous action-button-previous'),
+																_0: _elm_lang$html$Html_Attributes$class('next action-button'),
 																_1: {
 																	ctor: '::',
-																	_0: _elm_lang$html$Html_Attributes$value('previous'),
+																	_0: _elm_lang$html$Html_Attributes$value('Next'),
 																	_1: { ctor: '[]' }
 																}
 															}
 														}
 													}, { ctor: '[]' }),
-													_1: {
-														ctor: '::',
-														_0: A2(_elm_lang$html$Html$input, {
-															ctor: '::',
-															_0: _elm_lang$html$Html_Attributes$type_('button'),
-															_1: {
-																ctor: '::',
-																_0: _elm_lang$html$Html_Attributes$name('next'),
-																_1: {
-																	ctor: '::',
-																	_0: _elm_lang$html$Html_Attributes$class('next action-button'),
-																	_1: {
-																		ctor: '::',
-																		_0: _elm_lang$html$Html_Attributes$value('next'),
-																		_1: { ctor: '[]' }
-																	}
-																}
-															}
-														}, { ctor: '[]' }),
-														_1: { ctor: '[]' }
-													}
+													_1: { ctor: '[]' }
 												}
 											}
 										}
@@ -10427,7 +12000,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 										_1: { ctor: '[]' }
 									}, {
 										ctor: '::',
-										_0: _elm_lang$html$Html$text('Create a new account'),
+										_0: _elm_lang$html$Html$text('Social Profile'),
 										_1: { ctor: '[]' }
 									}),
 									_1: {
@@ -10438,7 +12011,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 											_1: { ctor: '[]' }
 										}, {
 											ctor: '::',
-											_0: _elm_lang$html$Html$text('Please provide new account details'),
+											_0: _elm_lang$html$Html$text('Please provide a social network profile'),
 											_1: { ctor: '[]' }
 										}),
 										_1: {
@@ -10448,10 +12021,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 												_0: _elm_lang$html$Html_Attributes$type_('text'),
 												_1: {
 													ctor: '::',
-													_0: _elm_lang$html$Html_Attributes$name('username'),
+													_0: _elm_lang$html$Html_Attributes$name('twitter'),
 													_1: {
 														ctor: '::',
-														_0: _elm_lang$html$Html_Attributes$placeholder('username'),
+														_0: _elm_lang$html$Html_Attributes$placeholder('Twitter'),
 														_1: { ctor: '[]' }
 													}
 												}
@@ -10460,13 +12033,13 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 												ctor: '::',
 												_0: A2(_elm_lang$html$Html$input, {
 													ctor: '::',
-													_0: _elm_lang$html$Html_Attributes$type_('password'),
+													_0: _elm_lang$html$Html_Attributes$type_('text'),
 													_1: {
 														ctor: '::',
-														_0: _elm_lang$html$Html_Attributes$name('pwd'),
+														_0: _elm_lang$html$Html_Attributes$name('facebook'),
 														_1: {
 															ctor: '::',
-															_0: _elm_lang$html$Html_Attributes$placeholder('Password'),
+															_0: _elm_lang$html$Html_Attributes$placeholder('Facebook'),
 															_1: { ctor: '[]' }
 														}
 													}
@@ -10475,13 +12048,13 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 													ctor: '::',
 													_0: A2(_elm_lang$html$Html$input, {
 														ctor: '::',
-														_0: _elm_lang$html$Html_Attributes$type_('password'),
+														_0: _elm_lang$html$Html_Attributes$type_('text'),
 														_1: {
 															ctor: '::',
-															_0: _elm_lang$html$Html_Attributes$name('cpwd'),
+															_0: _elm_lang$html$Html_Attributes$name('instagram'),
 															_1: {
 																ctor: '::',
-																_0: _elm_lang$html$Html_Attributes$placeholder('Confirm Password'),
+																_0: _elm_lang$html$Html_Attributes$placeholder('Instagram'),
 																_1: { ctor: '[]' }
 															}
 														}
@@ -10499,7 +12072,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 																	_0: _elm_lang$html$Html_Attributes$class('previous action-button-previous'),
 																	_1: {
 																		ctor: '::',
-																		_0: _elm_lang$html$Html_Attributes$value('previous'),
+																		_0: _elm_lang$html$Html_Attributes$value('Previous'),
 																		_1: { ctor: '[]' }
 																	}
 																}
@@ -10512,13 +12085,13 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 																_0: _elm_lang$html$Html_Attributes$type_('button'),
 																_1: {
 																	ctor: '::',
-																	_0: _elm_lang$html$Html_Attributes$name('submit'),
+																	_0: _elm_lang$html$Html_Attributes$name('next'),
 																	_1: {
 																		ctor: '::',
-																		_0: _elm_lang$html$Html_Attributes$class('submit action-button'),
+																		_0: _elm_lang$html$Html_Attributes$class('next action-button'),
 																		_1: {
 																			ctor: '::',
-																			_0: _elm_lang$html$Html_Attributes$value('submit'),
+																			_0: _elm_lang$html$Html_Attributes$value('Next'),
 																			_1: { ctor: '[]' }
 																		}
 																	}
@@ -10532,22 +12105,200 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 										}
 									}
 								}),
-								_1: { ctor: '[]' }
+								_1: {
+									ctor: '::',
+									_0: A2(_elm_lang$html$Html$fieldset, { ctor: '[]' }, {
+										ctor: '::',
+										_0: A2(_elm_lang$html$Html$h2, {
+											ctor: '::',
+											_0: _elm_lang$html$Html_Attributes$class('fs-title'),
+											_1: { ctor: '[]' }
+										}, {
+											ctor: '::',
+											_0: _elm_lang$html$Html$text('Create a new account'),
+											_1: { ctor: '[]' }
+										}),
+										_1: {
+											ctor: '::',
+											_0: A2(_elm_lang$html$Html$h3, {
+												ctor: '::',
+												_0: _elm_lang$html$Html_Attributes$class('fs-subtitle'),
+												_1: { ctor: '[]' }
+											}, {
+												ctor: '::',
+												_0: _elm_lang$html$Html$text('Please provide new account details'),
+												_1: { ctor: '[]' }
+											}),
+											_1: {
+												ctor: '::',
+												_0: A2(_elm_lang$html$Html$input, {
+													ctor: '::',
+													_0: _elm_lang$html$Html_Attributes$type_('text'),
+													_1: {
+														ctor: '::',
+														_0: _elm_lang$html$Html_Attributes$name('username'),
+														_1: {
+															ctor: '::',
+															_0: _elm_lang$html$Html_Attributes$placeholder('username'),
+															_1: { ctor: '[]' }
+														}
+													}
+												}, { ctor: '[]' }),
+												_1: {
+													ctor: '::',
+													_0: A2(_elm_lang$html$Html$input, {
+														ctor: '::',
+														_0: _elm_lang$html$Html_Attributes$type_('password'),
+														_1: {
+															ctor: '::',
+															_0: _elm_lang$html$Html_Attributes$name('pwd'),
+															_1: {
+																ctor: '::',
+																_0: _elm_lang$html$Html_Attributes$placeholder('Password'),
+																_1: { ctor: '[]' }
+															}
+														}
+													}, { ctor: '[]' }),
+													_1: {
+														ctor: '::',
+														_0: A2(_elm_lang$html$Html$input, {
+															ctor: '::',
+															_0: _elm_lang$html$Html_Attributes$type_('password'),
+															_1: {
+																ctor: '::',
+																_0: _elm_lang$html$Html_Attributes$name('cpwd'),
+																_1: {
+																	ctor: '::',
+																	_0: _elm_lang$html$Html_Attributes$placeholder('Confirm Password'),
+																	_1: { ctor: '[]' }
+																}
+															}
+														}, { ctor: '[]' }),
+														_1: {
+															ctor: '::',
+															_0: A2(_elm_lang$html$Html$input, {
+																ctor: '::',
+																_0: _elm_lang$html$Html_Attributes$type_('button'),
+																_1: {
+																	ctor: '::',
+																	_0: _elm_lang$html$Html_Attributes$name('previous'),
+																	_1: {
+																		ctor: '::',
+																		_0: _elm_lang$html$Html_Attributes$class('previous action-button-previous'),
+																		_1: {
+																			ctor: '::',
+																			_0: _elm_lang$html$Html_Attributes$value('Previous'),
+																			_1: { ctor: '[]' }
+																		}
+																	}
+																}
+															}, { ctor: '[]' }),
+															_1: {
+																ctor: '::',
+																_0: A2(_elm_lang$html$Html$input, {
+																	ctor: '::',
+																	_0: _elm_lang$html$Html_Attributes$type_('button'),
+																	_1: {
+																		ctor: '::',
+																		_0: _elm_lang$html$Html_Events$onClick(_agaviria$tuxedo$Msgs$SignupSubmit),
+																		_1: {
+																			ctor: '::',
+																			_0: _elm_lang$html$Html_Attributes$name('submit'),
+																			_1: {
+																				ctor: '::',
+																				_0: _elm_lang$html$Html_Attributes$class('submit action-button'),
+																				_1: {
+																					ctor: '::',
+																					_0: _elm_lang$html$Html_Attributes$value('Submit'),
+																					_1: { ctor: '[]' }
+																				}
+																			}
+																		}
+																	}
+																}, { ctor: '[]' }),
+																_1: { ctor: '[]' }
+															}
+														}
+													}
+												}
+											}
+										}
+									}),
+									_1: { ctor: '[]' }
+								}
 							}
 						}
-					}
+					}),
+					_1: { ctor: '[]' }
 				}),
 				_1: { ctor: '[]' }
 			}),
 			_1: { ctor: '[]' }
-		}),
-		_1: { ctor: '[]' }
-	}));
+		});
+	};
+	var _agaviria$tuxedo$View$indexView = function _agaviria$tuxedo$View$indexView(model) {
+		return A2(_elm_lang$html$Html$div, { ctor: '[]' }, {
+			ctor: '::',
+			_0: _elm_lang$html$Html$text('Welcome to Elm and Rocket'),
+			_1: { ctor: '[]' }
+		});
+	};
+	var _agaviria$tuxedo$View$page = function _agaviria$tuxedo$View$page(model) {
+		var _p0 = model.route;
+		switch (_p0.ctor) {
+			case 'IndexPage':
+				return _agaviria$tuxedo$View$indexView(model);
+			case 'SignupPage':
+				return _agaviria$tuxedo$View$signupView(model);
+			default:
+				return _agaviria$tuxedo$View$notFoundView;
+		}
+	};
+	var _agaviria$tuxedo$View$view = function _agaviria$tuxedo$View$view(model) {
+		return A2(_elm_lang$html$Html$div, {
+			ctor: '::',
+			_0: _elm_lang$html$Html_Attributes$class('container-fluid'),
+			_1: { ctor: '[]' }
+		}, {
+			ctor: '::',
+			_0: _agaviria$tuxedo$Views_HeaderView$navBar(model),
+			_1: {
+				ctor: '::',
+				_0: A2(_elm_lang$html$Html$div, {
+					ctor: '::',
+					_0: _elm_lang$html$Html_Attributes$class('container'),
+					_1: { ctor: '[]' }
+				}, {
+					ctor: '::',
+					_0: _agaviria$tuxedo$Views_HeaderView$flashMessage(model.flash),
+					_1: {
+						ctor: '::',
+						_0: _agaviria$tuxedo$View$page(model),
+						_1: { ctor: '[]' }
+					}
+				}),
+				_1: { ctor: '[]' }
+			}
+		});
+	};
+
+	var _agaviria$tuxedo$Main$subscriptions = function _agaviria$tuxedo$Main$subscriptions(model) {
+		return _elm_lang$core$Platform_Sub$none;
+	};
+	var _agaviria$tuxedo$Main$init = function _agaviria$tuxedo$Main$init(location) {
+		var currentRoute = _agaviria$tuxedo$Routing$parseLocation(location);
+		return {
+			ctor: '_Tuple2',
+			_0: _agaviria$tuxedo$Models$initModel(currentRoute),
+			_1: _elm_lang$core$Platform_Cmd$none
+		};
+	};
+	var _agaviria$tuxedo$Main$main = A2(_elm_lang$navigation$Navigation$program, _agaviria$tuxedo$Msgs$OnLocationChange, { init: _agaviria$tuxedo$Main$init, view: _agaviria$tuxedo$View$view, update: _agaviria$tuxedo$Update$update, subscriptions: _agaviria$tuxedo$Main$subscriptions })();
 
 	var Elm = {};
 	Elm['Main'] = Elm['Main'] || {};
 	if (typeof _agaviria$tuxedo$Main$main !== 'undefined') {
-		_agaviria$tuxedo$Main$main(Elm['Main'], 'Main', { "types": { "unions": {}, "aliases": {}, "message": "msg" }, "versions": { "elm": "0.18.0" } });
+		_agaviria$tuxedo$Main$main(Elm['Main'], 'Main', { "types": { "unions": { "Dict.LeafColor": { "args": [], "tags": { "LBBlack": [], "LBlack": [] } }, "Dict.Dict": { "args": ["k", "v"], "tags": { "RBNode_elm_builtin": ["Dict.NColor", "k", "v", "Dict.Dict k v", "Dict.Dict k v"], "RBEmpty_elm_builtin": ["Dict.LeafColor"] } }, "RemoteData.RemoteData": { "args": ["e", "a"], "tags": { "NotAsked": [], "Success": ["a"], "Loading": [], "Failure": ["e"] } }, "Dict.NColor": { "args": [], "tags": { "BBlack": [], "Red": [], "NBlack": [], "Black": [] } }, "Msgs.Msg": { "args": [], "tags": { "OnLocationChange": ["Navigation.Location"], "Logout": [], "SignupSubmit": [], "OnFetchSession": ["RemoteData.WebData Models.Session"] } }, "Http.Error": { "args": [], "tags": { "BadUrl": ["String"], "NetworkError": [], "Timeout": [], "BadStatus": ["Http.Response String"], "BadPayload": ["String", "Http.Response String"] } } }, "aliases": { "Models.Session": { "args": [], "type": "{ user : Models.User, jwt : String }" }, "RemoteData.WebData": { "args": ["a"], "type": "RemoteData.RemoteData Http.Error a" }, "Http.Response": { "args": ["body"], "type": "{ url : String , status : { code : Int, message : String } , headers : Dict.Dict String String , body : body }" }, "Models.User": { "args": [], "type": "{ id : Int, username : String, email : String }" }, "Navigation.Location": { "args": [], "type": "{ href : String , host : String , hostname : String , protocol : String , origin : String , port_ : String , pathname : String , search : String , hash : String , username : String , password : String }" } }, "message": "Msgs.Msg" }, "versions": { "elm": "0.18.0" } });
 	}
 
 	if (typeof define === "function" && define['amd']) {
